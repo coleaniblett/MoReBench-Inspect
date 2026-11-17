@@ -68,7 +68,8 @@ See `uv run inspect eval --help` for all available options.
 
 ### `morebench`
 
-No task parameters.
+- `judge_target` (Literal['both', 'thinking_trace', 'model_resp']): Which text the judge reads: `both` (the default), scored once for the thinking trace and once for the final response from the same generation; or only `thinking_trace` or `model_resp`. (default: `'both'`)
+- `strict_verdicts` (bool): Read the judge's replies strictly, accepting only a reply that leads with yes or no, instead of with the original's substring rule. A reply the strict reading cannot read leaves the sample unscored. (default: `False`)
 <!-- /Parameters: Automatically Generated -->
 
 ## Dataset
