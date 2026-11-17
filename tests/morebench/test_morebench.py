@@ -16,6 +16,23 @@ def test_version_comes_from_eval_yaml() -> None:
     assert EVAL_VERSION == "1-A"
 
 
+def test_generation_settings(mocker: MockerFixture, public_row0: dict[str, Any]) -> None:
+    # DECISIONS.md D-06.
+    mocker.patch(
+        "morebench.morebench.load_morebench_dataset",
+        return_value=MemoryDataset([record_to_sample(public_row0)]),
+    )
+    config = morebench().config
+    assert config.max_tokens == 10500
+    assert config.reasoning_effort == "high"
+    assert config.reasoning_summary == "auto"
+    # A budget makes Inspect raise an error on Claude 4.7 and later.
+    assert config.reasoning_tokens is None
+    # Sampling settings are left to the command line.
+    assert config.temperature is None
+    assert config.top_p is None
+
+
 def test_end_to_end_with_mock_model(mocker: MockerFixture, public_row0: dict[str, Any]) -> None:
     # Offline: the loader is replaced by one real row. There is no scorer yet, so this
     # checks that the prompt reaches the model and a response comes back.

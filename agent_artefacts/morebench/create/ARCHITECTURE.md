@@ -71,16 +71,20 @@ def morebench_theory(judge_target: JudgeTarget = "model_resp") -> Task: ...
 - Generation settings are set on the task, so a user can still override them from the CLI (D-06):
 
   ```python
-  Task(..., config=GenerateConfig(max_tokens=10500, reasoning_tokens=10000, reasoning_summary="auto"))
+  Task(..., config=GenerateConfig(max_tokens=10500, reasoning_effort="high", reasoning_summary="auto"))
   ```
 
-- Temperature, top-p and reasoning effort are not set by the task. The README documents them as CLI flags per model family (D-06).
+- Temperature, top-p and a reasoning-token budget are not set by the task. The README documents them as CLI flags per model family (D-06).
+
+- Do not add `reasoning_tokens` to the task: Inspect raises an error for it on Claude 4.7 and later (D-06).
 
 ## Scorer design
 
 `morebench_scorer(judge_target)` in `scorers.py`, per sample:
 
-1. **Extract the judged text** from the final assistant message (D-08). If the judged text is the thinking trace and it is empty, return `Score.unscored` with the reason "no reasoning trace" and make no judge calls (D-07).
+1. **Extract the judged text** from the final assistant message with `extract_trace` or `extract_response` (D-08). If it is empty, return `Score.unscored` and make no judge calls. The reason is "no reasoning trace" when the trace was the judged text (D-07) and "no response" when the final response was (D-21).
+   - Both functions exist in `scorers.py` and follow the field rule in D-08. Never read a reasoning block's `reasoning` field directly: on a redacted block it is an encrypted payload or a signature.
+   - `inspect_evals_utils.messages.reasoning_to_text` is not used. It wraps the text in `<reasoning>` tags, which would change the judged text.
 2. **Build one judge prompt per criterion** (R-JUDGE-1, R-JUDGE-2).
 3. **Call the judge for all criteria concurrently.** Inspect's connection limits do the throttling that upstream's thread pool did (R-JUDGE-7).
 4. **Retry failures** (D-04): up to 3 further attempts per criterion, matching upstream's count, with the judged text unchanged and caching off.
@@ -116,7 +120,8 @@ Defined in `scoring.py`.
 | Criterion-level breakdowns | `Σ fulfilled / Σ total` across the run, per dimension and per weight.                                                                    | R-SCORE-7   |
 
 - `hard` is a custom metric because it needs two values from every sample.
-- Unscored samples are excluded from every metric, and the log shows how many there were.
+- Unscored samples are excluded from every metric above, and the log shows how many there were.
+- The run also reports the share of samples that had no judged text (D-07, D-21). It must not count samples that are unscored because the judge failed (D-04). Inspect drops a score that is unscored at the root before any metric runs and records only a count, `unscored_samples`, so a metric cannot see those samples. T5 settles how the share is produced, for example from a per-key value on the score, and records the choice here.
 
 ## Model roles and judge configuration
 
