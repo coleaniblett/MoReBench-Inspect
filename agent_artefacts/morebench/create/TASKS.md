@@ -18,7 +18,7 @@ Update this table at the end of each task.
 | T3   | Prompts                                | 4.2                    | Done 2026-11-16 |
 | T4   | Dataset loading                        | 4.1                    | Done 2026-11-16 |
 | T5   | Scoring rule and metrics               | 4.3                    | Not started     |
-| T6   | Judge scorer                           | 4.3                    | Not started     |
+| T6   | Judge scorer                           | 4.3                    | Started         |
 | T7   | Assemble `morebench` and smoke-test it | 4.4–4.8                | Started         |
 | T8   | Add `morebench_theory`                 | 4                      | Not started     |
 | T9   | Test coverage and lint pass            | 5, 6.1–6.2             | Not started     |
@@ -112,13 +112,13 @@ ______________________________________________________________________
 ## T5 — Scoring rule and metrics
 
 - **Goal:** the per-sample score and every run-level metric, as pure code with no model calls.
-- **Needs:** D-02, D-03, D-11, D-12, D-13.
+- **Needs:** D-02, D-03, D-07, D-11, D-12, D-13, D-21.
 - **Load:** `REQUIREMENTS.md § Scoring and metrics`; `ARCHITECTURE.md § Scorer design` (the `Score.value` table only); `ARCHITECTURE.md § Metrics`, `ARCHITECTURE.md § Test design`.
 - **Touch:** `src/morebench/scoring.py`, `tests/morebench/test_scoring.py`.
 - **Steps:**
   1. Port the scoring rule, with the upstream line reference.
   2. Write the helper that turns one sample's judgements into the `Score.value` dictionary.
-  3. Write `regular`, `length`, `hard` and the two kinds of breakdown.
+  3. Write `regular`, `length`, `hard`, the two kinds of breakdown, and the share of samples with no judged text (D-07, D-21). Settle how that share is produced and record it in `ARCHITECTURE.md § Metrics`.
   4. Test every golden case and the run-level golden case.
   5. Test each metric through the real epoch reducer, and with all-usable, some-usable, none-usable and legitimate-zero inputs, and with zero length.
 - **Done when:** all golden cases pass and the eval lint has no finding against `scoring.py`.
@@ -127,14 +127,14 @@ ______________________________________________________________________
 ## T6 — Judge scorer
 
 - **Goal:** a scorer that judges one response against its rubric and returns the T5 score.
-- **Needs:** D-04, D-05, D-07, D-08, D-15.
+- **Needs:** D-04, D-05, D-07, D-08, D-15, D-21.
 - **Load:** `REQUIREMENTS.md § Judging`; `REQUIREMENTS.md § Generation` (R-GEN-6 and R-GEN-7 only); `ARCHITECTURE.md § Scorer design`, `ARCHITECTURE.md § Model roles and judge configuration`, `ARCHITECTURE.md § Test design`.
 - **Touch:** `src/morebench/scorers.py`, `tests/morebench/test_scorers.py`.
 - **Steps:**
-  1. Write trace and response extraction. Look at `inspect_evals_utils.messages` first and reuse what fits.
+  1. Trace and response extraction. Done on 2026-11-16: `extract_trace` and `extract_response` exist with tests. Use them as they are.
   2. Resolve the judge through the `grader` role with the default from D-05.
   3. Judge all criteria concurrently with the T3 judge prompt.
-  4. Add the retry and the unscored path from D-04, and the empty-trace path from D-07.
+  4. Add the retry and the unscored path from D-04, and the empty-text paths from D-07 and D-21.
   5. Test with a mocked judge: all yes, all no, mixed, other text, a failure that recovers on retry, a failure that does not, an empty trace. Assert the number of judge calls and the exact prompt sent.
 - **Done when:** the tests pass with no real model call.
 - **Stop and ask if:** Inspect returns reasoning content in a form D-08 does not cover.
@@ -146,10 +146,10 @@ ______________________________________________________________________
 - **Load:** `REQUIREMENTS.md § Generation` (R-GEN-5 and R-GEN-6); `ARCHITECTURE.md § Task interface`, `ARCHITECTURE.md § Solver design`.
 - **Touch:** `src/morebench/morebench.py`, `src/morebench/__init__.py`, `src/morebench/eval.yaml`, `tests/morebench/test_morebench.py`.
 - **Steps:**
-  1. Wire dataset, `generate()`, scorer and generation settings into the task. Remove the template's placeholder records and their test.
-  2. Set `dataset_samples: 500` in `eval.yaml` and regenerate the README sections.
+  1. Wire the scorer and the `judge_target` parameter into the task. The dataset, `generate()` and the generation settings were wired on 2026-11-16, and the placeholder records are gone.
+  2. `dataset_samples: 500` is set in `eval.yaml`. Regenerate the README sections after adding the parameter.
   3. Add end-to-end tests with a mock model and a mock judge, for both judge targets. Keep the version test.
-  4. For D-06, find out what each Inspect provider sends for the token limit and the reasoning budget, and record it in the decision.
+  4. What each Inspect provider sends was recorded on 2026-11-16: see "The reasoning probe" and D-06 in `DECISIONS.md`. Nothing more to do here.
   5. **Checkpoint.** Give the owner the `--limit 1` command for one real model. After it has run, read the log together and confirm: the prompt is the expected text; a thinking trace was captured; the number of judge calls equals the number of criteria; the judge replies are `yes` or `no`. Record in D-08 how many reasoning blocks the model returned.
 - **Done when:** all checks pass and the smoke run has been reviewed.
 - **Stop and ask if:** the smoke run shows an empty trace, a truncated response or malformed judge replies.
