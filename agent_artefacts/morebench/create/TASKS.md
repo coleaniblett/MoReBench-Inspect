@@ -10,21 +10,21 @@ To start a task:
 
 Update this table at the end of each task.
 
-| Task | Title                                  | GL `create-eval` phase | Status          |
-| ---- | -------------------------------------- | ---------------------- | --------------- |
-| T0   | Sign off the decisions (owner)         | 1.5, 2.7               | Done 2026-11-16 |
-| T1   | Verify the spec against upstream       | 1                      | Done 2026-11-16 |
-| T2   | Scaffold                               | 3                      | Done 2026-11-16 |
-| T3   | Prompts                                | 4.2                    | Done 2026-11-16 |
-| T4   | Dataset loading                        | 4.1                    | Done 2026-11-16 |
-| T5   | Scoring rule and metrics               | 4.3                    | Not started     |
-| T6   | Judge scorer                           | 4.3                    | Started         |
-| T7   | Assemble `morebench` and smoke-test it | 4.4–4.8                | Started         |
-| T8   | Add `morebench_theory`                 | 4                      | Not started     |
-| T9   | Test coverage and lint pass            | 5, 6.1–6.2             | Not started     |
-| T10  | README                                 | 6.3                    | Not started     |
-| T11  | Parity run and evaluation report       | 6.4                    | Not started     |
-| T12  | Validity review and submission prep    | 6.4                    | Not started     |
+| Task | Title                               | GL `create-eval` phase | Status          |
+| ---- | ----------------------------------- | ---------------------- | --------------- |
+| T0   | Sign off the decisions (owner)      | 1.5, 2.7               | Done 2026-11-16 |
+| T1   | Verify the spec against upstream    | 1                      | Done 2026-11-16 |
+| T2   | Scaffold                            | 3                      | Done 2026-11-16 |
+| T3   | Prompts                             | 4.2                    | Done 2026-11-16 |
+| T4   | Dataset loading                     | 4.1                    | Done 2026-11-16 |
+| T5   | Scoring rule and judge scorer       | 4.3, 4.4               | Done 2026-11-17 |
+| T6   | Metrics                             | 4.3                    | Done 2026-11-17 |
+| T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17 |
+| T8   | Add `morebench_theory`              | 4                      | Not started     |
+| T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Not started     |
+| T10  | README                              | 6.3                    | Not started     |
+| T11  | Parity run and evaluation report    | 6.4                    | Not started     |
+| T12  | Validity review and submission prep | 6.4                    | Not started     |
 
 ## Rules for every task
 
@@ -109,50 +109,56 @@ ______________________________________________________________________
 - **Done when:** the counts in R-DATA-5 and R-DATA-6 are asserted by tests and pass.
 - **Stop and ask if:** a row fails to parse or an ID collides.
 
-## T5 — Scoring rule and metrics
+## T5 — Scoring rule and judge scorer
 
-- **Goal:** the per-sample score and every run-level metric, as pure code with no model calls.
-- **Needs:** D-02, D-03, D-07, D-11, D-12, D-13, D-21.
-- **Load:** `REQUIREMENTS.md § Scoring and metrics`; `ARCHITECTURE.md § Scorer design` (the `Score.value` table only); `ARCHITECTURE.md § Metrics`, `ARCHITECTURE.md § Test design`.
-- **Touch:** `src/morebench/scoring.py`, `tests/morebench/test_scoring.py`.
+- **Goal:** `morebench` scores every response: one judge call per criterion, on the thinking trace and on the final response separately, every verdict stored, and the per-sample score as the weighted share of criteria satisfied.
+- **Needs:** D-02, D-03, D-04, D-05, D-07, D-08, D-11, D-15, D-16, D-21, D-22.
+- **Load:** `REQUIREMENTS.md § Judging`; `REQUIREMENTS.md § Scoring and metrics` (R-SCORE-1, R-SCORE-2 and R-SCORE-7 only); `REQUIREMENTS.md § Generation` (R-GEN-6 and R-GEN-7 only); `ARCHITECTURE.md § Task interface`, `ARCHITECTURE.md § Scorer design`, `ARCHITECTURE.md § Model roles and judge configuration`, `ARCHITECTURE.md § Test design`.
+- **Touch:** `src/morebench/scoring.py` (new), `src/morebench/scorers.py`, `src/morebench/morebench.py`, the generated sections of `src/morebench/README.md`; `tests/morebench/test_scoring.py` (new), `tests/morebench/test_scorers.py`, `tests/morebench/test_morebench.py`, `tests/morebench/conftest.py`, `tests/morebench/data/morebench_public_row405.json` (new).
 - **Steps:**
-  1. Port the scoring rule, with the upstream line reference.
-  2. Write the helper that turns one sample's judgements into the `Score.value` dictionary.
-  3. Write `regular`, `length`, `hard`, the two kinds of breakdown, and the share of samples with no judged text (D-07, D-21). Settle how that share is produced and record it in `ARCHITECTURE.md § Metrics`.
-  4. Test every golden case and the run-level golden case.
-  5. Test each metric through the real epoch reducer, and with all-usable, some-usable, none-usable and legitimate-zero inputs, and with zero length.
-- **Done when:** all golden cases pass and the eval lint has no finding against `scoring.py`.
+  1. Trace and response extraction were done on 2026-11-16: `extract_trace` and `extract_response` exist with tests. Use them as they are.
+  2. Port the scoring rule into `scoring.py` with the upstream line reference, and write the helper that turns one sample's judgements into the `Score.value` dictionary. Add the strict reading from D-22 beside upstream's rule.
+  3. Write the scorer: the judge through the `grader` role with the default and settings from D-05; the T3 judge prompt; all criteria concurrently; the retry and unscored path from D-04; the empty-text paths from D-07 and D-21; the metadata listed in `ARCHITECTURE.md § Scorer design`, including every verdict, the stop reason and the number of reasoning blocks.
+  4. Confirm with the installed Inspect, without calling an API, that the default judge gets upstream's settings and that a bound `grader` role keeps its own (D-22). Write what was checked into `ARCHITECTURE.md § Model roles and judge configuration`.
+  5. Wire it into `morebench`: `judge_target` (default `both`, one scorer per text) and `strict_verdicts` (default `False`). For now attach only `regular` (the mean of `score`) to each scorer; T6 adds the other metrics. Record in `ARCHITECTURE.md § Scorer design` how the scorer names are given. Regenerate the README sections.
+  6. Write the row-405 fixture by script from the pinned dataset, as the other rows were written, and add its fixture to `conftest.py`.
+  7. Test every golden case G1 to G12 on the pure function, with no judge calls. G11 is the 75 test and G12 the 64.7 test.
+  8. Test the scorer with a mocked judge: all yes, all no, mixed, other text, a failure that recovers on retry, a failure that does not, an empty trace, an empty response, and the strict reading on a reply that is not `yes` or `no`. Assert the number of judge calls and the exact prompt sent.
+  9. Add end-to-end tests with a mock model and a mock judge for `both` and for each single judge target. Keep the version test.
+- **Done when:** the 75 and 64.7 tests and every other golden case pass, the scorer and end-to-end tests pass with no real model call, and all checks pass. The owner then reads the diff; write the report so that each changed file can be followed.
+- **Stop and ask if:** Inspect returns reasoning content in a form D-08 does not cover; the `Score.value` shape has to change (update `ARCHITECTURE.md` first); a golden case cannot be matched (never adjust its expected value).
+
+## T6 — Metrics
+
+- **Goal:** every run-level metric, as pure code, attached to both scorers.
+- **Needs:** D-07, D-11, D-12, D-13, D-21.
+- **Load:** `REQUIREMENTS.md § Scoring and metrics`; `ARCHITECTURE.md § Scorer design` (the `Score.value` table only); `ARCHITECTURE.md § Metrics`, `ARCHITECTURE.md § Test design`.
+- **Touch:** `src/morebench/scoring.py`, `src/morebench/scorers.py` (attaching the metrics only), `tests/morebench/test_scoring.py`, the generated sections of `src/morebench/README.md` if they change.
+- **Steps:**
+  1. `regular`: the mean sample score, with standard error. `length`: the mean character length of the judged text. `hard`: `regular × 1000 / length`, one ratio per run and judged text, not a mean of per-sample ratios, from unrounded values (D-12).
+  2. The sample-level breakdowns (R-SCORE-6), and the criterion-level rates by dimension and by weight: unweighted and pooled over criteria (R-SCORE-7, D-13).
+  3. The share of samples with no judged text (D-07, D-21). Settle how it is produced and record it in `ARCHITECTURE.md § Metrics`. Read the T5 note there first: the scorer returns such a sample unscored, which no metric can see, so this step probably changes `scorers.py` beyond attaching metrics. Ask before doing so.
+     - *Owner's ruling (2026-11-17):* a third scorer that makes no model calls and flags, per sample, whether a trace and a final response were found; the mean of each flag is the share. It is attached whatever the judge target. The ruling added `src/morebench/morebench.py`, `tests/morebench/test_scorers.py` and `tests/morebench/test_morebench.py` to the Touch list, and allowed the change to `scorers.py`. Recorded in D-07 and `ARCHITECTURE.md § Metrics`.
+  4. Attach every metric to both scorers, replacing the T5 placeholder.
+  5. Test the paper's Hard check (61.3 and 3,895 give 15.7) and the other run-level golden case. Test each metric through the real epoch reducer, and with all-usable, some-usable, none-usable and legitimate-zero inputs, and with zero length.
+- **Done when:** 61.3 and 3,895 give 15.7, the other run-level golden case passes, all checks pass, and the eval lint has no finding against `scoring.py`.
 - **Stop and ask if:** the `Score.value` shape has to change. Update `ARCHITECTURE.md` first.
 
-## T6 — Judge scorer
+## T7 — Smoke test, small run and retro
 
-- **Goal:** a scorer that judges one response against its rubric and returns the T5 score.
-- **Needs:** D-04, D-05, D-07, D-08, D-15, D-21.
-- **Load:** `REQUIREMENTS.md § Judging`; `REQUIREMENTS.md § Generation` (R-GEN-6 and R-GEN-7 only); `ARCHITECTURE.md § Scorer design`, `ARCHITECTURE.md § Model roles and judge configuration`, `ARCHITECTURE.md § Test design`.
-- **Touch:** `src/morebench/scorers.py`, `tests/morebench/test_scorers.py`.
+- **Goal:** `morebench` runs against real models, and a small run on one open-weight model gives first numbers for both judged texts.
+- **Needs:** D-06, D-16, D-18. The run informs D-19.
+- **Load:** `REQUIREMENTS.md § Generation` (R-GEN-5 and R-GEN-6); `REQUIREMENTS.md § Reported results`; `DECISIONS.md` D-08 and D-19; `ARCHITECTURE.md § Task interface`.
+- **Touch:** `DECISIONS.md` (D-08, D-19), `CLAUDE.md` (the retro rule), SPEC.md §13. Source files only to fix a defect the run shows, after asking.
 - **Steps:**
-  1. Trace and response extraction. Done on 2026-11-16: `extract_trace` and `extract_response` exist with tests. Use them as they are.
-  2. Resolve the judge through the `grader` role with the default from D-05.
-  3. Judge all criteria concurrently with the T3 judge prompt.
-  4. Add the retry and the unscored path from D-04, and the empty-text paths from D-07 and D-21.
-  5. Test with a mocked judge: all yes, all no, mixed, other text, a failure that recovers on retry, a failure that does not, an empty trace. Assert the number of judge calls and the exact prompt sent.
-- **Done when:** the tests pass with no real model call.
-- **Stop and ask if:** Inspect returns reasoning content in a form D-08 does not cover.
-
-## T7 — Assemble `morebench` and smoke-test it
-
-- **Goal:** `morebench` runs end to end, offline in tests and once against real models.
-- **Needs:** D-06, D-16, D-18.
-- **Load:** `REQUIREMENTS.md § Generation` (R-GEN-5 and R-GEN-6); `ARCHITECTURE.md § Task interface`, `ARCHITECTURE.md § Solver design`.
-- **Touch:** `src/morebench/morebench.py`, `src/morebench/__init__.py`, `src/morebench/eval.yaml`, `tests/morebench/test_morebench.py`.
-- **Steps:**
-  1. Wire the scorer and the `judge_target` parameter into the task. The dataset, `generate()` and the generation settings were wired on 2026-11-16, and the placeholder records are gone.
-  2. `dataset_samples: 500` is set in `eval.yaml`. Regenerate the README sections after adding the parameter.
-  3. Add end-to-end tests with a mock model and a mock judge, for both judge targets. Keep the version test.
-  4. What each Inspect provider sends was recorded on 2026-11-16: see "The reasoning probe" and D-06 in `DECISIONS.md`. Nothing more to do here.
-  5. **Checkpoint.** Give the owner the `--limit 1` command for one real model. After it has run, read the log together and confirm: the prompt is the expected text; a thinking trace was captured; the number of judge calls equals the number of criteria; the judge replies are `yes` or `no`. Record in D-08 how many reasoning blocks the model returned.
-- **Done when:** all checks pass and the smoke run has been reviewed.
-- **Stop and ask if:** the smoke run shows an empty trace, a truncated response or malformed judge replies.
+  1. **Smoke run.** `--limit 2` of `morebench` on `openrouter/openai/gpt-oss-120b` with the paper's Table 4 settings for gpt-oss (`--temperature 1.0 --top-p 0.95`), both texts judged. Read the log and confirm: the prompt is the expected text; a thinking trace was captured; each sample made one judge call per criterion for each text; the judge replies are `yes` or `no`; the stop reason; how many reasoning blocks came back.
+  2. Estimate the cost of the small run from the smoke run's token use.
+  3. **Small run.** 50 scenarios, shuffled with a fixed seed so the categories are mixed, with the same model and settings, in the background. It may run overnight.
+  4. Read the log: Regular, length and Hard for each text; unscored samples and why; replies that were not exactly `yes` or `no`; stop reasons; trace length against the paper's 1,272 characters. Set the numbers beside the paper's gpt-oss-120b rows as a first indication, not a parity claim.
+  5. Record what was found in D-08 (reasoning blocks) and D-19 (trace length, spread, cost).
+  6. **Retro.** What did the agents get wrong today, and what instruction would have prevented it? Add the rule to `CLAUDE.md` with its reason.
+- **Done when:** the small run has finished, its results are recorded, and the retro rule is in `CLAUDE.md`.
+- **Stop and ask if:** the smoke run shows an empty trace, a truncated response or malformed judge replies, or the cost estimate is above $10.
 
 ## T8 — Add `morebench_theory`
 
