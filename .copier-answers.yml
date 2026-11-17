@@ -1,0 +1,17 @@
+# This file is auto-generated and updated by Copier; do not edit by hand.
+# Run `copier update` to pull in template changes.
+_commit: v2.0.0
+_src_path: gh:Generality-Labs/inspect-evals-template
+author_email: coleaniblett@gmail.com
+author_name: ColeANiblett
+eval_description: 'Inspect port of MoReBench: evaluating the moral reasoning process
+    of language models with rubric-based LLM-judge scoring'
+eval_name: morebench
+github_owner: Generality-Labs
+github_username: ColeANiblett
+include_examples: true
+include_llm_judge_example: true
+layout: multi-eval
+license: MIT
+python_version: '3.12'
+use_template_update: true
