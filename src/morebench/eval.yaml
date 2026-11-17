@@ -1,10 +1,11 @@
-title: "morebench"
+title: "MoReBench: Procedural and Pluralistic Moral Reasoning"
 description: |
-  Inspect port of MoReBench: evaluating the moral reasoning process of language models with rubric-based LLM-judge scoring
-group: Knowledge # pick the group used by the inspect_evals listing for this benchmark
+  Evaluates the moral reasoning process of language models. A model is given a moral dilemma and asked for its reasoning and decision. A judge model then checks the response against 20 to 47 weighted, expert-written rubric criteria, one criterion per call, and the score is the share of rubric weight earned.
+arxiv: https://arxiv.org/abs/2510.16380
+group: Safeguards
 contributors:
   - ColeANiblett
 version: "1-A"
 tasks:
   - name: morebench
-    dataset_samples: 2
+    dataset_samples: 500

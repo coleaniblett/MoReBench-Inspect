@@ -1,6 +1,6 @@
-# morebench
+# MoReBench
 
-Inspect port of MoReBench: evaluating the moral reasoning process of language models with rubric-based LLM-judge scoring
+An Inspect port of [MoReBench](https://arxiv.org/abs/2510.16380), which evaluates the moral reasoning process of language models. A model is given a moral dilemma and asked for its reasoning and decision. A judge model then checks the response against 20 to 47 weighted, expert-written rubric criteria, and the score is the share of rubric weight earned.
 
 <!-- Contributors: Automatically Generated -->
 Contributed by [@ColeANiblett](https://github.com/ColeANiblett)

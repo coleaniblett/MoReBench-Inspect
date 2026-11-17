@@ -19,6 +19,8 @@ src/morebench/
 
 tests/morebench/
   __init__.py
+  conftest.py         fixtures that load the rows in data/
+  data/               three real dataset rows as JSON, for offline tests
   test_prompts.py     T3
   test_dataset.py     T4
   test_scoring.py     T5
@@ -27,7 +29,8 @@ tests/morebench/
 ```
 
 - The task file stays `morebench.py` (lint IEFS002) and `__init__.py` exports every task (IEFS003).
-- `prompts.py` holds text copied from upstream (MIT). It starts with an attribution comment naming the repository, commit and licence, and contains nothing else.
+- `prompts.py` holds text copied from upstream (MIT). It starts with an attribution comment naming the repository, commit and licence. Besides the text it contains only the two builders, `generation_prompt(dilemma, theory)` and `judge_prompt(response, criterion)`.
+- The string constants in `prompts.py` were written by a script that read upstream's source at the pinned commit, with characters outside ASCII as escapes. They are not to be edited by hand; the checksum tests guard them.
 
 ## Task interface
 
@@ -49,16 +52,16 @@ def morebench_theory(judge_target: JudgeTarget = "model_resp") -> Task: ...
 ## Dataset loading
 
 - Constants in `dataset.py`: `DATASET_PATH = "morebench/morebench"`, `DATASET_REVISION = "d900e89f942f784f8e0113935034b4f0541a0b55"`.
-- Load with `inspect_evals_utils.huggingface.hf_dataset`, by config name (`morebench_public` or `morebench_theory`), split `test`, at `DATASET_REVISION` (R-DATA-1, D-10). No filter.
+- `load_morebench_dataset(config_name)` loads with `inspect_evals_utils.huggingface.hf_dataset`, by config name (`morebench_public` or `morebench_theory`), split `test`, at `DATASET_REVISION` (R-DATA-1, D-10). No filter. That wrapper raises unless `revision` is passed.
 - `record_to_sample` builds:
   - `input`: the full prompt, template followed directly by the dilemma (R-GEN-1 to R-GEN-3).
-  - `id`: `create_stable_id` over the dilemma and the theory (D-09).
+  - `id`: `create_stable_id(dilemma, theory, prefix="morebench")` (D-09). This is the prefix and 8 hex characters, for example `morebench_999672f2` for public row 0. The 650 IDs are distinct within and across the two configs.
   - `metadata`:
     - `rubric`: the parsed criteria, each as `id`, `title`, `weight`, `dimension` (R-DATA-4).
-    - `dilemma_source`, `dilemma_type`, `role_domain`, `theory`, `context`: the raw column values.
+    - `dilemma_source`, `dilemma_type`, `role_domain`, `theory`, `context`: the raw column values. `context` is `None` where the cell is empty (R-DATA-2).
     - `dilemma_source_group`: `dilemma_source` truncated to its first two `_`-separated tokens (R-SCORE-6).
-    - `row_index`: the row's position in its config (R-DATA-3).
   - No `target`. The rubric is the ground truth and lives in metadata.
+- The loader then adds `row_index` to each sample's metadata: the row's position in its config (R-DATA-3). `record_to_sample` cannot set it, because Inspect does not pass the position to it, so a sample built by `record_to_sample` alone has no `row_index`.
 - `RUBRIC` is parsed with `ast.literal_eval`. A row whose rubric does not parse, or has a zero or out-of-range weight, raises: it is a dataset defect, not something to skip.
 
 ## Solver design
@@ -137,6 +140,8 @@ Defined in `scoring.py`.
 
 All tests are offline and deterministic unless marked. A test that downloads the dataset carries both `@pytest.mark.dataset_download` and `@pytest.mark.huggingface`.
 
+Offline tests use three real rows stored as JSON in `tests/morebench/data/`: public row 0, and Theory rows 0 and 72. Row 72 is the first with an empty `CONTEXT`. A script wrote them from the pinned CSVs, with empty cells as null. The two full-prompt checksums in R-GEN-4 prove that the row 0 dilemmas are unaltered, and a marked test compares all three with the loaded dataset.
+
 | File                | What it proves                                                                                                                                            |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `test_dataset.py`   | `record_to_sample` on a real row; rubric parsing; ID uniqueness; `assert_huggingface_dataset_structure`; the counts in R-DATA-5 and R-DATA-6.             |
@@ -170,4 +175,4 @@ Golden case for the run-level metrics: two samples with scores 50 and 100 and le
 
 - No new runtime dependencies are expected: `inspect_ai` and `inspect-evals-utils[huggingface]` cover loading, IDs and the model API.
 - Anything imported under `src/morebench/` must be a runtime dependency in `pyproject.toml`. Adding one needs approval (SPEC.md, Boundaries).
-- T2 confirms which provider package the default judge needs at run time and that the README says so.
+- The default judge, `openrouter/openai/gpt-oss-120b`, needs the `openai` package and an `OPENROUTER_API_KEY`: Inspect's OpenRouter provider checks for the OpenAI client before it loads (`inspect_ai/model/_providers/providers.py`, `openrouter()`). `openai` 3.51.0 is installed, but only through the `dev` dependency group, so someone who installs the package without that group cannot run the default judge. The README has to say so (T10). Whether to make `openai` a runtime dependency is the owner's call and is not yet decided.

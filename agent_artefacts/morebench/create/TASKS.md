@@ -14,12 +14,12 @@ Update this table at the end of each task.
 | ---- | -------------------------------------- | ---------------------- | --------------- |
 | T0   | Sign off the decisions (owner)         | 1.5, 2.7               | Done 2026-11-16 |
 | T1   | Verify the spec against upstream       | 1                      | Done 2026-11-16 |
-| T2   | Scaffold                               | 3                      | Not started     |
-| T3   | Prompts                                | 4.2                    | Not started     |
-| T4   | Dataset loading                        | 4.1                    | Not started     |
+| T2   | Scaffold                               | 3                      | Done 2026-11-16 |
+| T3   | Prompts                                | 4.2                    | Done 2026-11-16 |
+| T4   | Dataset loading                        | 4.1                    | Done 2026-11-16 |
 | T5   | Scoring rule and metrics               | 4.3                    | Not started     |
 | T6   | Judge scorer                           | 4.3                    | Not started     |
-| T7   | Assemble `morebench` and smoke-test it | 4.4–4.8                | Not started     |
+| T7   | Assemble `morebench` and smoke-test it | 4.4–4.8                | Started         |
 | T8   | Add `morebench_theory`                 | 4                      | Not started     |
 | T9   | Test coverage and lint pass            | 5, 6.1–6.2             | Not started     |
 | T10  | README                                 | 6.3                    | Not started     |
