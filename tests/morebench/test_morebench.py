@@ -1,25 +1,55 @@
+from typing import Any
+
+import pytest
 from inspect_ai import eval
+from inspect_ai.dataset import MemoryDataset
 from pytest_inspect_evals.assertions import assert_eval_success
+from pytest_mock import MockerFixture
 
 from morebench import morebench
-from morebench.morebench import EVAL_VERSION, SAMPLE_RECORDS, record_to_sample
-
-
-def test_record_to_sample() -> None:
-    sample = record_to_sample(SAMPLE_RECORDS[0])
-    assert sample.id == "sample-1"
-    assert sample.input == "What is 2 + 2?"
-    assert sample.target == "4"
+from morebench.dataset import PUBLIC_CONFIG, record_to_sample
+from morebench.morebench import EVAL_VERSION
+from morebench.prompts import NEUTRAL_TEMPLATE
 
 
 def test_version_comes_from_eval_yaml() -> None:
     assert EVAL_VERSION == "1-A"
 
 
-def test_end_to_end_with_mock_model() -> None:
-    # mockllm/model returns a fixed string, so the scores exist but are not CORRECT;
-    # this checks the pipeline, not the answer.
+def test_end_to_end_with_mock_model(mocker: MockerFixture, public_row0: dict[str, Any]) -> None:
+    # Offline: the loader is replaced by one real row. There is no scorer yet, so this
+    # checks that the prompt reaches the model and a response comes back.
+    load = mocker.patch(
+        "morebench.morebench.load_morebench_dataset",
+        return_value=MemoryDataset([record_to_sample(public_row0)]),
+    )
     [log] = eval(tasks=morebench(), model="mockllm/model")
-    assert_eval_success(log, expected_sample_count=2)
+    load.assert_called_once_with(PUBLIC_CONFIG)
+    assert_eval_success(log, require_scorer=False, expected_sample_count=1)
     assert log.samples is not None
-    assert all(s.scores is not None and "match" in s.scores for s in log.samples)
+    [sample] = log.samples
+    assert sample.id == "morebench_999672f2"
+    assert sample.input == NEUTRAL_TEMPLATE + public_row0["DILEMMA"]
+    # One user message and no system message (R-GEN-1), then the model's reply.
+    assert [message.role for message in sample.messages] == ["user", "assistant"]
+    assert sample.output.completion
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
+def test_end_to_end_with_mock_model_on_the_real_dataset() -> None:
+    [log] = eval(tasks=morebench(), model="mockllm/model", limit=5)
+    assert_eval_success(log, require_scorer=False, expected_sample_count=5)
+    assert log.eval.dataset.samples == 500
+    assert log.samples is not None
+    for sample in log.samples:
+        assert isinstance(sample.input, str)
+        assert sample.input.startswith(NEUTRAL_TEMPLATE)
+        assert set(sample.metadata) >= {
+            "rubric",
+            "dilemma_source",
+            "dilemma_type",
+            "role_domain",
+            "theory",
+            "row_index",
+        }
