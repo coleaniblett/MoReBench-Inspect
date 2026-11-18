@@ -3,11 +3,12 @@ from collections import Counter
 from typing import Any
 
 import pytest
-from inspect_ai.dataset import Dataset, Sample
+from inspect_ai.dataset import Dataset, MemoryDataset, Sample
 from pytest_inspect_evals.huggingface import (
     assert_huggingface_dataset_structure,
     get_dataset_infos_dict,
 )
+from pytest_mock import MockerFixture
 
 from morebench.dataset import (
     DATASET_PATH,
@@ -18,7 +19,8 @@ from morebench.dataset import (
     record_to_sample,
     source_group,
 )
-from morebench.prompts import NEUTRAL_TEMPLATE, THEORY_DEFINITIONS
+from morebench.prompts import NEUTRAL_TEMPLATE, THEORY_DEFINITIONS, generation_prompt
+from morebench.scoring import THEORY_CATEGORY_KEYS
 
 COLUMNS = [
     "DILEMMA",
@@ -159,6 +161,30 @@ def test_source_group(dilemma_source: str, group: str) -> None:
     assert source_group(dilemma_source) == group
 
 
+def test_the_loader_reads_the_pinned_revision_and_numbers_the_rows(
+    mocker: MockerFixture, public_row0: dict[str, Any], public_row405: dict[str, Any]
+) -> None:
+    # Offline: Hugging Face is replaced by real rows, so the loader's own work is
+    # checked without the marked tests below. The pins are SPEC.md §2's.
+    rows = [public_row0, public_row405]
+    load = mocker.patch(
+        "morebench.dataset.hf_dataset",
+        return_value=MemoryDataset([record_to_sample(row) for row in rows]),
+    )
+    dataset = load_morebench_dataset(PUBLIC_CONFIG)
+    load.assert_called_once_with(
+        path="morebench/morebench",
+        name="morebench_public",
+        split="test",
+        revision="d900e89f942f784f8e0113935034b4f0541a0b55",
+        sample_fields=record_to_sample,
+    )
+    # Each sample gets its position, as upstream identifies a scenario by its row, and
+    # keeps the rest of its metadata.
+    for row_index, (sample, row) in enumerate(zip(dataset, rows, strict=True)):
+        assert metadata_of(sample) == {**metadata_of(record_to_sample(row)), "row_index": row_index}
+
+
 # ---- against the pinned dataset on Hugging Face --------------------------------
 
 
@@ -267,6 +293,37 @@ def test_theory_dataset_counts(theory_dataset: Dataset) -> None:
 
 @pytest.mark.dataset_download
 @pytest.mark.huggingface
+def test_theory_rows_set_each_dilemma_once_under_every_theory(theory_dataset: Dataset) -> None:
+    # R-DATA-6: 30 distinct dilemmas, each once under each of the five theories, and
+    # every input is the theory template of its own row (R-TASK-2, R-GEN-3).
+    theories_by_dilemma: dict[str, list[str]] = {}
+    for sample in theory_dataset:
+        theory = metadata_of(sample)["theory"]
+        instruction = generation_prompt("", theory)
+        assert isinstance(sample.input, str)
+        assert sample.input.startswith(instruction)
+        dilemma = sample.input.removeprefix(instruction)
+        theories_by_dilemma.setdefault(dilemma, []).append(theory)
+    assert len(theories_by_dilemma) == 30
+    for theories in theories_by_dilemma.values():
+        assert sorted(theories) == sorted(THEORY_DEFINITIONS)
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
+def test_theory_breakdown_values_are_distinct_across_keys(theory_dataset: Dataset) -> None:
+    # R-SCORE-6: Theory is broken down by theory and by source group. The metric names
+    # each entry by its value alone, so no value may occur under both keys.
+    values = {key: count(theory_dataset, key) for key in THEORY_CATEGORY_KEYS}
+    assert values == {
+        "theory": dict.fromkeys(THEORY_DEFINITIONS, 30),
+        "dilemma_source_group": {"daily_dilemmas": 50, "ai_risk": 50, "expert_written": 50},
+    }
+    assert set(values["theory"]).isdisjoint(values["dilemma_source_group"])
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
 def test_ids_are_unique_and_rows_keep_their_position(
     public_dataset: Dataset, theory_dataset: Dataset
 ) -> None:
@@ -285,11 +342,13 @@ def test_loaded_rows_match_the_fixture_rows(
     public_dataset: Dataset,
     theory_dataset: Dataset,
     public_row0: dict[str, Any],
+    public_row405: dict[str, Any],
     theory_row0: dict[str, Any],
     theory_row72: dict[str, Any],
 ) -> None:
     for loaded, row in [
         (public_dataset[0], public_row0),
+        (public_dataset[405], public_row405),
         (theory_dataset[0], theory_row0),
         (theory_dataset[72], theory_row72),
     ]:

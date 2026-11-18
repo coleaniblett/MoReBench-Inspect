@@ -10,9 +10,10 @@ from pytest_inspect_evals.metrics import (
     run_metrics,
 )
 
-from morebench.dataset import PUBLIC_CONFIG, load_morebench_dataset, parse_rubric, record_to_sample
+from morebench.dataset import parse_rubric
 from morebench.scoring import (
     CATEGORY_KEYS,
+    THEORY_CATEGORY_KEYS,
     category_regular,
     dimension_rate,
     hard,
@@ -93,6 +94,17 @@ def test_row405_fixture_is_the_paper_dilemma(public_row405: dict[str, Any]) -> N
     assert "Himalayan expedition" in public_row405["DILEMMA"]
     assert public_row405["THEORY"] == "neutral"
     assert sum(abs(weight) for weight in weights_of(public_row405)) == 51
+
+
+@pytest.mark.parametrize(
+    ("weights", "judgements"), [([1, 2], ["yes"]), ([1], ["yes", "no"])], ids=["fewer", "more"]
+)
+def test_a_reply_count_that_differs_from_the_rubric_is_refused(
+    weights: list[int], judgements: list[str]
+) -> None:
+    # A score from a cut-short list would leave criteria out of the total.
+    with pytest.raises(ValueError, match="zip"):
+        score_criteria(weights, judgements)
 
 
 # ---- the verdict rules ----------------------------------------------------------
@@ -578,6 +590,42 @@ def test_category_regular_groups_by_the_upstream_keys() -> None:
     assert CATEGORY_KEYS == ("dilemma_source_group", "role_domain", "dilemma_type")
 
 
+def test_theory_metrics_break_down_by_theory_and_source() -> None:
+    # R-SCORE-6: Theory's categories (calculate_morebench_theory.py L31). Each theory's
+    # entry is named by the whole theory name, as upstream names its columns (R-SCORE-9).
+    assert THEORY_CATEGORY_KEYS == ("theory", "dilemma_source_group")
+    metrics = run_metrics(
+        judge_metrics(THEORY_CATEGORY_KEYS),
+        [[SAMPLE_A], [SAMPLE_B]],
+        metadata=[
+            {**META_A, "theory": "Kantian Deontology"},
+            {**META_B, "theory": "Act Utilitarianism"},
+        ],
+    )
+    # Theories, then source groups, each in alphabetical order; no role or type entries.
+    breakdowns = ["Act Utilitarianism", "Kantian Deontology", "ai_risk", "daily_dilemmas"]
+    assert list(metrics) == [
+        *["regular", "stderr", "length", "hard"],
+        *breakdowns,
+        *[name for name in TWO_SAMPLES if name.startswith(("dimension_", "weight_"))],
+    ]
+    assert {name: metrics[name] for name in breakdowns} == {
+        "Act Utilitarianism": pytest.approx(100.0),
+        "Kantian Deontology": pytest.approx(50.0),
+        "ai_risk": pytest.approx(100.0),
+        "daily_dilemmas": pytest.approx(50.0),
+    }
+    # Everything else is as for the main benchmark.
+    main_categories = {
+        *["ai_risk", "daily_dilemmas"],
+        *["ai_advisor", "ai_agent"],
+        *["long_case", "short_case"],
+    }
+    assert {name: value for name, value in metrics.items() if name not in breakdowns} == {
+        name: value for name, value in TWO_SAMPLES.items() if name not in main_categories
+    }
+
+
 def test_category_regular_refuses_a_value_under_two_keys() -> None:
     # Two keys sharing a value would merge two categories into one entry.
     with pytest.raises(MetricEvalError, match="occurs under two keys"):
@@ -632,17 +680,3 @@ def test_no_text_share_with_no_sample() -> None:
     # sample reached scoring. Inspect then reports NaN under the metric's name.
     metrics = run_metrics([no_text_share()], [[NO_TEXT]])
     assert nan_as_text(metrics) == {"no_text_share": "nan"}
-
-
-# ---- against the pinned dataset on Hugging Face --------------------------------
-
-
-@pytest.mark.dataset_download
-@pytest.mark.huggingface
-def test_the_row405_fixture_matches_the_loaded_dataset(public_row405: dict[str, Any]) -> None:
-    loaded = load_morebench_dataset(PUBLIC_CONFIG)[405]
-    expected = record_to_sample(public_row405)
-    assert loaded.id == expected.id
-    assert loaded.input == expected.input
-    assert loaded.metadata is not None
-    assert {k: v for k, v in loaded.metadata.items() if k != "row_index"} == expected.metadata

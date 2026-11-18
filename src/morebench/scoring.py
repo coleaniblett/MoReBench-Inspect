@@ -12,6 +12,7 @@ reducer leaves it. Unscored samples never reach them. None of them rounds (D-12)
 import math
 import re
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from statistics import fmean
 from typing import Any, cast
 
@@ -32,6 +33,10 @@ PERCENT = 100
 # value to its first two `_`-separated tokens (utils.py L332-L336); the loader stores
 # the dilemma source cut that way, and the other two values are already two tokens.
 CATEGORY_KEYS = ("dilemma_source_group", "role_domain", "dilemma_type")
+
+# The same for MoReBench-Theory, from calculate_morebench_theory.py L31 at e6689bb. The
+# theory values are whole theory names, which upstream does not cut.
+THEORY_CATEGORY_KEYS = ("theory", "dilemma_source_group")
 
 # A weight's group in `Score.value`, written by `score_value`: `w3`, `w-2`.
 WEIGHT_GROUP = re.compile(r"w(-?\d+)")
@@ -293,18 +298,22 @@ def weight_rate() -> Metric:
     return compute
 
 
-def judge_metrics() -> list[Metric]:
+def judge_metrics(category_keys: Sequence[str] = CATEGORY_KEYS) -> list[Metric]:
     """Return every run-level metric of one judged text (ARCHITECTURE.md § Metrics).
 
     Each judge scorer carries the full set, so `length` and `hard` are always those of
     the text that scorer judged.
+
+    Args:
+        category_keys: The sample metadata keys the score is broken down by:
+            `CATEGORY_KEYS` for the main benchmark, `THEORY_CATEGORY_KEYS` for Theory.
     """
     return [
         regular(),
         stderr(to_float=score_as_float),
         length(),
         hard(),
-        category_regular(list(CATEGORY_KEYS)),
+        category_regular(list(category_keys)),
         dimension_rate(),
         weight_rate(),
     ]
