@@ -137,7 +137,7 @@ Notes:
 
 ### The judge
 
-The default judge is `openrouter/openai/gpt-oss-120b`, the original's judge, with the original's settings: temperature 1, top-p 1, 10,500 tokens and reasoning effort high (D-05). It needs `OPENROUTER_API_KEY`. The `openai` package it uses is installed with the eval.
+The default judge is `openrouter/openai/gpt-oss-120b`, the original's judge, with the original's settings: temperature 1, top-p 1, 10,500 tokens and reasoning effort high (D-05). The effort is sent as Inspect sends it, which differs from the original's request in the way described under [Generation settings](#generation-settings). It needs `OPENROUTER_API_KEY`. The `openai` package it uses is installed with the eval.
 
 The judge is Inspect's `grader` model role. Change the model with `--model-role grader=<provider/model>`, and a setting by naming it in the binding:
 
@@ -170,10 +170,10 @@ uv run inspect eval morebench/morebench --model openai/gpt-5 -T judge_target=mod
 
 Each reply gives two texts, and each is judged by its own scorer from the same generation (D-16):
 
-- `thinking_trace`: the model's reasoning, read from Inspect's reasoning blocks. A block gives its summary when the provider returns the reasoning redacted (OpenAI and Anthropic do), and otherwise its reasoning (gpt-oss through OpenRouter does). The blocks are joined with newlines (D-08). For closed models this is usually a summary of the thinking, as the paper notes.
 - `model_resp`: the final response, the reply's text blocks joined with nothing between them.
+- `thinking_trace`: the model's reasoning, read from Inspect's reasoning blocks. A block gives its summary when the provider returns the reasoning redacted (OpenAI and Anthropic do), and otherwise its reasoning (gpt-oss through OpenRouter does). The blocks are joined with newlines (D-08). For closed models this is usually a summary of the thinking, as the paper notes.
 
-The original's scripts judge one text per pass of an existing generation file: by default the trace for the main benchmark and the final response for Theory. The port judges both by default; `judge_target` narrows it to one.
+The original's scripts judge one text per pass of an existing generation file: by default the trace for the main benchmark and the final response for Theory. The port judges both by default; `judge_target` narrows it to one. With both, the final response's scorer comes first, so its score is the first a run shows: on gpt-oss-120b the trace score does not measure the trace (see [Known limitations](#known-limitations)).
 
 ### Per-sample score
 
@@ -202,7 +202,7 @@ An error from the judge's API is not caught. Inspect retries it with backoff. If
 
 ### Metrics
 
-Each judge scorer reports these metrics under its own name: `thinking_trace` and `model_resp`, or `theory_thinking_trace` and `theory_model_resp` for `morebench_theory`. For example, `model_resp/regular`.
+Each judge scorer reports these metrics under its own name: `model_resp` and `thinking_trace`, or `theory_model_resp` and `theory_thinking_trace` for `morebench_theory`. For example, `model_resp/regular`, which is the first metric a run shows when both texts are judged.
 
 | Metric                  | What it is                                                                          | The paper's name                    |
 | ----------------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
@@ -230,8 +230,8 @@ Each scored sample's metadata keeps, for each judged text: every criterion's ver
 The original's judge prompt puts the judged text straight after `Reasoning Response:`, with no delimiter around it. The port keeps that prompt byte for byte, so that scores stay comparable with the paper, and has no option that changes it (D-14). On gpt-oss-120b's thinking traces this matters (D-03):
 
 - In a 50-scenario run of gpt-oss-120b, judged by the default judge, 1,038 of 1,179 judge replies on thinking traces (88%) were not `yes` or `no`, and every sample had some. On final responses it was 3 of 1,179 (0.3%).
-- gpt-oss writes its trace as a plan addressed to itself ("We need to give a moral reasoning and decision"). The judge's own reasoning shows it taking that plan as its instructions, and it writes the moral advice instead of a verdict.
-- Under the original's substring rule those essays credit most negative criteria (75 to 93%) and meet few positive ones (26 to 32%). The more such replies a sample had, the lower its trace score.
+- gpt-oss writes its trace as a plan addressed to itself ("We need to give a moral reasoning and decision"). The judge's own reasoning shows it taking that plan as its instructions, and it writes the moral advice instead of a verdict. 89 of the 1,038 replies were instead the judge refusing ("I'm sorry, but I can't help with that."), which contains neither word and so earns nothing either way.
+- Under the original's substring rule the judge's trace replies credit most negative criteria (75 to 93%, depending on the weight) and meet few positive ones (26 to 32%). The more replies a sample had that were not `yes` or `no`, the lower its trace score.
 - The strict reading is no way round it. With `strict_verdicts=true`, 55% of the trace criteria got no readable verdict in four attempts, and all 50 samples were left unscored.
 - A one-sample check on MoReBench-Theory showed the same: 16 of 23 trace replies were not `yes` or `no`, against none of the 23 final-response replies.
 
@@ -244,6 +244,7 @@ In the same run, gpt-oss-120b's traces averaged 5,899 characters (median 5,320, 
 ### Other limits
 
 - The judge is not deterministic. As in the original, it runs at temperature 1 with no OpenRouter provider pinned, so its verdicts vary between runs (D-05).
+- The judge's verdicts are imperfect, though about as close to the experts' labels as a second expert's are. The paper measured gpt-oss-120b at 76.29 macro-F1 in its weakest category, against 72.87 for a human expert. That was on 7,176 criterion judgements of responses from GPT-5, Claude Opus 4.1 and DeepSeek-R1-0528 (§3.1, Table 5). The paper does not report it separately for thinking traces, or for gpt-oss's own output.
 - No Claude result can be compared with the paper, because both of the paper's Claude models are retired (D-19).
 - Cost, as estimated from the runs so far with gpt-oss-120b as both the model under test and the judge, at OpenRouter's list price: $1.81 for the 50-scenario run, so about $18 for all 500 scenarios with both texts judged; about $8 for all 150 Theory rows, from a single sample.
 
@@ -257,7 +258,7 @@ The table lists every place where the port differs from the original on purpose 
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Reading the judge's verdict (D-03)    | Substring tests on the lower-cased reply: `yes` anywhere meets a positive criterion, and `no` anywhere, including in "not", "know" and "none", credits a negative one. | The same by default. `strict_verdicts=true` reads only a reply that starts with `yes` or `no` (D-22).                                                                                                                                                                                                                                                            | Kept quirk | None by default. On gpt-oss-120b's thinking traces most replies are not `yes` or `no`; see [Known limitations](#known-limitations).                         |
 | Judge failures (D-04)                 | A failed call is skipped, and scoring refuses to run until every judgement exists; a person reruns the judge.                                                          | An empty reply, or with `strict_verdicts` one that cannot be read, is retried up to 3 times with the cache off. A criterion that still has no usable reply leaves the sample unscored (`grader_failed`), never scored 0 or scored on the criteria that did get a reply. An API error is not caught: the sample errors, and `inspect eval-retry` resumes the run. | Deviation  | None when the judge replies. Unscored samples are visible in the log.                                                                                       |
-| No thinking trace (D-07)              | Judges an empty string, which gives a meaningless non-zero score, and the Hard score divides by zero.                                                                  | The sample is unscored ("no reasoning trace") and no judge calls are made. The share of such samples is reported as `no_text/thinking_trace`.                                                                                                                                                                                                                    | Deviation  | None for the paper's models, which all returned traces. On a model that sometimes skips thinking, the trace score covers only the samples where it thought. |
+| No thinking trace (D-07)              | Judges an empty string, which gives a meaningless non-zero score; if no sample has a trace, the Hard score divides by zero.                                            | The sample is unscored ("no reasoning trace") and no judge calls are made. The share of such samples is reported as `no_text/thinking_trace`.                                                                                                                                                                                                                    | Deviation  | None for the paper's models, which all returned traces. On a model that sometimes skips thinking, the trace score covers only the samples where it thought. |
 | Reading the trace and response (D-08) | Three provider-specific rules, for Anthropic, OpenAI and OpenRouter.                                                                                                   | One rule over Inspect's reasoning blocks: a redacted block's summary, otherwise its reasoning, joined with newlines; the response is the text blocks joined. The original takes only the first OpenAI reasoning item, so if several come back the port's trace is longer. Every reply checked so far had one.                                                    | Deviation  | Possibly a small change in the trace's text and length, which moves Hard.                                                                                   |
 | Sample IDs (D-09)                     | The row index.                                                                                                                                                         | A stable hash of the dilemma and the theory. The row index is kept as `row_index`.                                                                                                                                                                                                                                                                               | Deviation  | None.                                                                                                                                                       |
 | Dataset loading (D-10)                | Loads CSV files with split `train`, then filters on `THEORY`.                                                                                                          | Loads by config name with split `test` at the pinned revision, with no filter. A test checks that every public row is `neutral` and no Theory row is.                                                                                                                                                                                                            | Deviation  | None: the same rows are loaded.                                                                                                                             |
@@ -265,7 +266,7 @@ The table lists every place where the port differs from the original on purpose 
 | The `other` dimension (D-13)          | Reports every dimension in the data, including `other` (23 criteria in public, 1 in Theory), which the paper does not mention.                                         | Reports all six dimensions, `other` included.                                                                                                                                                                                                                                                                                                                    | Kept quirk | None.                                                                                                                                                       |
 | Judge prompt (D-14)                   | No delimiter around the judged text, though inspect_evals' best practice is to delimit it.                                                                             | The same prompt, byte for byte.                                                                                                                                                                                                                                                                                                                                  | Kept quirk | None. On gpt-oss-120b's thinking traces the judge often answers the trace instead of judging it; see [Known limitations](#known-limitations).               |
 | The judge sees no scenario (D-15)     | The judge sees the judged text and one criterion's title, not the scenario, the weight or the dimension.                                                               | The same.                                                                                                                                                                                                                                                                                                                                                        | Kept quirk | None.                                                                                                                                                       |
-| No final response (D-21)              | Judges an empty string.                                                                                                                                                | The sample is unscored ("no response") and no judge calls are made. The share of such samples is reported as `no_text/model_resp`.                                                                                                                                                                                                                               | Deviation  | None unless a model returns no text.                                                                                                                        |
+| No final response (D-21)              | Judges an empty string. On OpenRouter a reply with no content is `None`, so the judge reads the text "None".                                                           | The sample is unscored ("no response") and no judge calls are made. The share of such samples is reported as `no_text/model_resp`.                                                                                                                                                                                                                               | Deviation  | None unless a model returns no text.                                                                                                                        |
 
 DECISIONS.md also records the choices made where the sources conflict or are silent, among them the generation settings (D-06), judging both texts by default (D-16), the 0 to 100 scale (D-11), one epoch (D-18), and making each fix an opt-in setting (D-22).
 
@@ -275,16 +276,16 @@ DECISIONS.md also records the choices made where the sources conflict or are sil
 flowchart LR
     HF["Hugging Face dataset<br/>at the pinned revision"] --> R2S["record_to_sample<br/>prompt, rubric, ID"]
     R2S --> GEN["generate()<br/>model under test"]
-    GEN -->|thinking trace| TT["thinking_trace scorer"]
     GEN -->|final response| MR["model_resp scorer"]
+    GEN -->|thinking trace| TT["thinking_trace scorer"]
     GEN --> NT["no_text scorer<br/>no model calls"]
-    TT <-->|one call per criterion| J["grader role<br/>default gpt-oss-120b"]
-    MR <-->|one call per criterion| J
-    TT --> M["scoring rule and metrics"]
-    MR --> M
+    MR <-->|one call per criterion| J["grader role<br/>default gpt-oss-120b"]
+    TT <-->|one call per criterion| J
+    MR --> M["scoring rule and metrics"]
+    TT --> M
 ```
 
-`morebench_theory` is built the same way, with the Theory config and template, and with the scorers `theory_thinking_trace` and `theory_model_resp`, which judge in the same way but break the score down by theory and source.
+`morebench_theory` is built the same way, with the Theory config and template, and with the scorers `theory_model_resp` and `theory_thinking_trace`, which judge in the same way but break the score down by theory and source.
 
 | File           | What it holds                                                                                            |
 | -------------- | -------------------------------------------------------------------------------------------------------- |
@@ -315,5 +316,5 @@ uv run inspect eval morebench/morebench --model openrouter/openai/gpt-oss-120b -
 | Thinking trace | 34.1 ± 2.8 / 5,899 / 5.8                                   | 50.8 / 1,272 / 39.9 (Table 6)                     |
 
 - All 50 samples were scored for both texts, and none errored.
-- The final-response score is within one standard error of the paper's. The trace score is not, for the two reasons under [Known limitations](#known-limitations).
+- The final-response score is within one standard error of the paper's. Its responses are 27% longer than the paper's (7,911 characters against 6,213), so its Hard score is lower (9.1 against 11.3). The trace score is not within one standard error, for the two reasons under [Known limitations](#known-limitations).
 - 5 of the 50 final responses were the same refusal. They were judged as written, as in the original, and scored 5 to 32.

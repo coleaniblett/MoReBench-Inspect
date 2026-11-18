@@ -29,23 +29,8 @@ Slow tests run with `uv run pytest --runslow`. See [CONTRIBUTING.md](CONTRIBUTIN
 ```text
 src/morebench/        the eval: task module, eval.yaml, README.md
 tests/morebench/      its tests
-src/examples/            gpqa, agentic, llm_judge: worked examples, see Examples below
-tests/examples/          their tests
 agent_artefacts/trajectory_analysis/inspect_scout/   Scout scanners for the transcript audit
 ```
-
-## Examples
-
-`src/examples/` holds worked examples that are separate from your eval. They are not registered as a package, so run them by file path:
-
-```bash
-uv run inspect eval src/examples/gpqa/gpqa.py --limit 5
-uv run inspect eval src/examples/agentic/agentic.py                        # ReAct agent, needs Docker
-uv run inspect eval src/examples/agentic/agentic.py -T agent=claude_code   # Claude Code through inspect_swe
-uv run inspect eval src/examples/llm_judge/llm_judge.py
-```
-
-When your eval works, commit your changes and remove the examples with `uvx copier update --defaults --data include_examples=false`, then run `uv sync`. The update deletes `src/examples/` and `tests/examples/`, drops the `inspect-swe` dev dependency and the examples line in `AGENTS.md`, and applies any newer template release. An update never changes `README.md`, so delete this section and the two examples lines under Layout by hand.
 
 ## Skills
 

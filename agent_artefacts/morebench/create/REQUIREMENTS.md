@@ -219,11 +219,17 @@ Table 6's Average row is not the mean of the 14 model rows printed above it, whi
 
 MoReBench-Theory, Overall / length / Overall-LC:
 
-| Model           | Final response (Table 9) | Thinking trace (Table 10) |
-| --------------- | ------------------------ | ------------------------- |
-| GPT-5-high      | 79.1 / 4,200 / 18.8      | 67.9 / 4,965 / 13.7       |
-| Claude Sonnet 4 | 64.2 / 2,563 / 25.0      | 62.7 / 3,399 / 18.4       |
-| Average         | 73.8 / 5,795.5 / 14      | 61.6 / 4,194.4 / 16.8     |
+| Model            | Final response (Table 9) | Thinking trace (Table 10) |
+| ---------------- | ------------------------ | ------------------------- |
+| GPT-5-high       | 79.1 / 4,200 / 18.8      | 67.9 / 4,965 / 13.7       |
+| Claude Sonnet 4  | 64.2 / 2,563 / 25.0      | 62.7 / 3,399 / 18.4       |
+| Claude Opus 4.1  | 64.8 / 2,824 / 22.9      | 62.4 / 2,704 / 23.1       |
+| Gemini-2.5-Pro   | 73.4 / 6,613 / 11.1      | 35.0 / 3,549 / 9.9        |
+| GPT-oss-120b     | 76.7 / 6,824 / 11.2      | 68.2 / 1,648 / 41.4       |
+| Deepseek-r1-0528 | 74.9 / 5,887 / 12.7      | 69.4 / 2,947 / 23.5       |
+| Average          | 73.8 / 5,795.5 / 14      | 61.6 / 4,194.4 / 16.8     |
+
+T12 added the four rows after GPT-5-high and Claude Sonnet 4, from paper v2, so that the Theory table covers the main table's models.
 
 The per-category columns of these tables are in the paper and are copied into the evaluation report in task T11.
 
