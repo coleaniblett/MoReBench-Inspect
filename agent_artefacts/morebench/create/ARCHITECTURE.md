@@ -15,7 +15,8 @@ src/morebench/
   scoring.py      the per-sample scoring rule (pure functions), the Score.value builder and the metrics
   scorers.py      the judge scorers (two per task), the no_text scorer, JudgeTarget and trace/response extraction
   eval.yaml       metadata; lists both tasks
-  README.md       generated sections + Dataset, Scoring, Deviations, Architecture, Evaluation Report
+  README.md       generated sections + Dataset, Generation settings, Scoring, Known limitations,
+                  Deviations, Architecture, Evaluation Report
 
 tests/morebench/
   __init__.py

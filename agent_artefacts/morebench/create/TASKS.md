@@ -22,7 +22,7 @@ Update this table at the end of each task.
 | T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17 |
 | T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17 |
 | T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Done 2026-11-17 |
-| T10  | README                              | 6.3                    | Not started     |
+| T10  | README                              | 6.3                    | Done 2026-11-17 |
 | T11  | Parity run and evaluation report    | 6.4                    | Not started     |
 | T12  | Validity review and submission prep | 6.4                    | Not started     |
 
@@ -193,6 +193,7 @@ ______________________________________________________________________
 - **Goal:** the eval's README documents what it is, how it scores and where it differs from upstream.
 - **Load:** `DECISIONS.md`, all of it; `REQUIREMENTS.md § Sources and pins`, `REQUIREMENTS.md § Dataset`, `REQUIREMENTS.md § Scoring and metrics`; `ARCHITECTURE.md § File structure`.
 - **Touch:** `src/morebench/README.md`.
+  - *Added in T10:* `ARCHITECTURE.md § File structure`, for the README's list of sections. T10 also read `REQUIREMENTS.md § Generation` (R-GEN-5 to R-GEN-7), `§ Judging` and `§ Reported results`, and the source modules, because step 4's flags, the judge prompt, the paper's numbers and the metric names are there.
 - **Steps:**
   1. Regenerate the generated sections. Do not edit them by hand.
   2. Write Dataset and Scoring. Name the default judge, how to override it, and how many judge calls a sample makes.
