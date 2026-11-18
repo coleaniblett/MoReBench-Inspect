@@ -3,11 +3,12 @@ from collections import Counter
 from typing import Any
 
 import pytest
-from inspect_ai.dataset import Dataset, Sample
+from inspect_ai.dataset import Dataset, MemoryDataset, Sample
 from pytest_inspect_evals.huggingface import (
     assert_huggingface_dataset_structure,
     get_dataset_infos_dict,
 )
+from pytest_mock import MockerFixture
 
 from morebench.dataset import (
     DATASET_PATH,
@@ -158,6 +159,30 @@ def test_the_same_dilemma_gets_a_different_id_under_each_theory(
 )
 def test_source_group(dilemma_source: str, group: str) -> None:
     assert source_group(dilemma_source) == group
+
+
+def test_the_loader_reads_the_pinned_revision_and_numbers_the_rows(
+    mocker: MockerFixture, public_row0: dict[str, Any], public_row405: dict[str, Any]
+) -> None:
+    # Offline: Hugging Face is replaced by real rows, so the loader's own work is
+    # checked without the marked tests below. The pins are SPEC.md §2's.
+    rows = [public_row0, public_row405]
+    load = mocker.patch(
+        "morebench.dataset.hf_dataset",
+        return_value=MemoryDataset([record_to_sample(row) for row in rows]),
+    )
+    dataset = load_morebench_dataset(PUBLIC_CONFIG)
+    load.assert_called_once_with(
+        path="morebench/morebench",
+        name="morebench_public",
+        split="test",
+        revision="d900e89f942f784f8e0113935034b4f0541a0b55",
+        sample_fields=record_to_sample,
+    )
+    # Each sample gets its position, as upstream identifies a scenario by its row, and
+    # keeps the rest of its metadata.
+    for row_index, (sample, row) in enumerate(zip(dataset, rows, strict=True)):
+        assert metadata_of(sample) == {**metadata_of(record_to_sample(row)), "row_index": row_index}
 
 
 # ---- against the pinned dataset on Hugging Face --------------------------------
@@ -317,11 +342,13 @@ def test_loaded_rows_match_the_fixture_rows(
     public_dataset: Dataset,
     theory_dataset: Dataset,
     public_row0: dict[str, Any],
+    public_row405: dict[str, Any],
     theory_row0: dict[str, Any],
     theory_row72: dict[str, Any],
 ) -> None:
     for loaded, row in [
         (public_dataset[0], public_row0),
+        (public_dataset[405], public_row405),
         (theory_dataset[0], theory_row0),
         (theory_dataset[72], theory_row72),
     ]:

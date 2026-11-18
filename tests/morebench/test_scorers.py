@@ -12,6 +12,7 @@ from inspect_ai.model import (
     ContentText,
     ModelName,
     ModelOutput,
+    StopReason,
 )
 from inspect_ai.scorer import Score, Scorer, Target
 from inspect_ai.solver import TaskState
@@ -29,7 +30,9 @@ from morebench.scorers import (
     judge_scorers,
     model_resp,
     no_text,
+    reasoning_blocks,
     reasoning_text,
+    reply_problem,
     thinking_trace,
 )
 from tests.morebench.conftest import Judge, always
@@ -156,6 +159,38 @@ def test_a_reply_with_only_reasoning_has_an_empty_response() -> None:
     assert extract_response(reply) == ""
 
 
+@pytest.mark.parametrize(
+    ("reply", "blocks"),
+    [
+        (ChatMessageAssistant(content="Just an answer."), 0),
+        (ChatMessageAssistant(content=[ContentText(text="Answer.")]), 0),
+        (openrouter_reply(), 1),
+        # A redacted block with no readable text is still a block.
+        (
+            ChatMessageAssistant(
+                content=[ContentReasoning(reasoning=ENCRYPTED, redacted=True), ContentText(text="")]
+            ),
+            1,
+        ),
+        (
+            ChatMessageAssistant(
+                content=[
+                    ContentReasoning(reasoning="First."),
+                    ContentText(text="Part one."),
+                    ContentReasoning(reasoning="Second."),
+                ]
+            ),
+            2,
+        ),
+    ],
+    ids=["plain-string", "text-only", "one", "redacted-unreadable", "two"],
+)
+def test_reasoning_blocks_are_counted(reply: ChatMessageAssistant, blocks: int) -> None:
+    # Recorded in each score's metadata, so a reply with more than one block, which D-08
+    # does not expect, shows in the log.
+    assert reasoning_blocks(reply) == blocks
+
+
 # ---- the judge scorers, with a mocked judge --------------------------------------
 
 TRACE = "We need to weigh the duty to follow advice against the duty to my values."
@@ -173,7 +208,9 @@ def reply_content(trace: str = TRACE, response: str = RESPONSE) -> list[Content]
     return content
 
 
-def state_for(row: dict[str, Any], content: list[Content]) -> TaskState:
+def state_for(
+    row: dict[str, Any], content: list[Content], stop_reason: StopReason = "stop"
+) -> TaskState:
     sample = record_to_sample(row)
     assert isinstance(sample.input, str)
     message = ChatMessageAssistant(content=content)
@@ -184,7 +221,7 @@ def state_for(row: dict[str, Any], content: list[Content]) -> TaskState:
         epoch=1,
         input=sample.input,
         messages=messages,
-        output=ModelOutput.from_message(message, stop_reason="stop"),
+        output=ModelOutput.from_message(message, stop_reason=stop_reason),
         metadata=sample.metadata,
     )
 
@@ -382,12 +419,34 @@ async def test_an_empty_response_is_unscored_without_judge_calls(
 ) -> None:
     # D-21: thinking used up the token limit before any answer was written.
     judge = always("yes")
-    state = state_for(public_row0, reply_content(response=" \n"))
+    state = state_for(public_row0, reply_content(response=" \n"), stop_reason="max_tokens")
     score = await run_scorer(mocker, model_resp, state, judge)
     assert is_unscored(score)
     assert score.reason == "no_response"
     assert score.explanation == "no response"
+    # The stop reason is kept, so the log shows why there was no response.
+    assert score.metadata == {"stop_reason": "max_tokens", "reasoning_blocks": 1}
     assert judge.calls == []
+
+
+@pytest.mark.parametrize(
+    ("reply", "strict", "problem"),
+    [
+        # D-04: an empty reply is a failure, and so is one of only whitespace.
+        ("", False, "empty reply"),
+        (" \n", False, "empty reply"),
+        (" \n", True, "empty reply"),
+        # D-03: under upstream's rule any other reply is usable, even one it cannot read.
+        ("maybe", False, None),
+        ("I do not know", False, None),
+        # D-22: the strict reading also refuses a reply it cannot read.
+        ("maybe", True, "no leading verdict"),
+        ("I do not know", True, "no leading verdict"),
+        ("yes", True, None),
+    ],
+)
+def test_which_judge_replies_are_failures(reply: str, strict: bool, problem: str | None) -> None:
+    assert reply_problem(reply, strict) == problem
 
 
 async def test_the_strict_reading_retries_then_unscores_an_unreadable_reply(

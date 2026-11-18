@@ -21,7 +21,7 @@ Update this table at the end of each task.
 | T6   | Metrics                             | 4.3                    | Done 2026-11-17 |
 | T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17 |
 | T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17 |
-| T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Not started     |
+| T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Done 2026-11-17 |
 | T10  | README                              | 6.3                    | Not started     |
 | T11  | Parity run and evaluation report    | 6.4                    | Not started     |
 | T12  | Validity review and submission prep | 6.4                    | Not started     |

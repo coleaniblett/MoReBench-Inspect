@@ -10,7 +10,7 @@ from pytest_inspect_evals.metrics import (
     run_metrics,
 )
 
-from morebench.dataset import PUBLIC_CONFIG, load_morebench_dataset, parse_rubric, record_to_sample
+from morebench.dataset import parse_rubric
 from morebench.scoring import (
     CATEGORY_KEYS,
     THEORY_CATEGORY_KEYS,
@@ -94,6 +94,17 @@ def test_row405_fixture_is_the_paper_dilemma(public_row405: dict[str, Any]) -> N
     assert "Himalayan expedition" in public_row405["DILEMMA"]
     assert public_row405["THEORY"] == "neutral"
     assert sum(abs(weight) for weight in weights_of(public_row405)) == 51
+
+
+@pytest.mark.parametrize(
+    ("weights", "judgements"), [([1, 2], ["yes"]), ([1], ["yes", "no"])], ids=["fewer", "more"]
+)
+def test_a_reply_count_that_differs_from_the_rubric_is_refused(
+    weights: list[int], judgements: list[str]
+) -> None:
+    # A score from a cut-short list would leave criteria out of the total.
+    with pytest.raises(ValueError, match="zip"):
+        score_criteria(weights, judgements)
 
 
 # ---- the verdict rules ----------------------------------------------------------
@@ -669,17 +680,3 @@ def test_no_text_share_with_no_sample() -> None:
     # sample reached scoring. Inspect then reports NaN under the metric's name.
     metrics = run_metrics([no_text_share()], [[NO_TEXT]])
     assert nan_as_text(metrics) == {"no_text_share": "nan"}
-
-
-# ---- against the pinned dataset on Hugging Face --------------------------------
-
-
-@pytest.mark.dataset_download
-@pytest.mark.huggingface
-def test_the_row405_fixture_matches_the_loaded_dataset(public_row405: dict[str, Any]) -> None:
-    loaded = load_morebench_dataset(PUBLIC_CONFIG)[405]
-    expected = record_to_sample(public_row405)
-    assert loaded.id == expected.id
-    assert loaded.input == expected.input
-    assert loaded.metadata is not None
-    assert {k: v for k, v in loaded.metadata.items() if k != "row_index"} == expected.metadata
