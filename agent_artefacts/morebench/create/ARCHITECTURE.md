@@ -84,7 +84,7 @@ def morebench_theory(judge_target: JudgeTarget = "both", strict_verdicts: bool =
 
 ## Scorer design
 
-One scorer per judged text, in `scorers.py`. With `judge_target="both"` the task carries both scorers. Each scorer's name says which text it judges (`thinking_trace` or `model_resp`), so every metric in the log is unambiguous.
+One scorer per judged text, in `scorers.py`. With `judge_target="both"` the task carries both scorers, the final response's first, so `model_resp/regular` is the first metric a run shows (the owner's ruling of 2026-11-18, D-16). Each scorer's name says which text it judges (`thinking_trace` or `model_resp`), so every metric in the log is unambiguous.
 
 **How the names are given (settled in T5):** there are two `@scorer` functions, named `thinking_trace` and `model_resp`. Inspect names a scorer after its registered function, and a decorator's `name` is fixed when the module loads, so one parameterised scorer could not carry a different name per text: used twice, it would appear as `judge` and `judge1`. Both functions are thin: each resolves the judge and calls the shared `judge_text(state, grader, extract, empty_explanation, strict)`. The log then has one entry per text, `thinking_trace` and `model_resp`, each with its metrics (`thinking_trace/regular`, `model_resp/regular`). A third scorer, `no_text`, follows them whatever the judge target (§ Metrics).
 
@@ -194,7 +194,7 @@ Defined in `scoring.py` (T6). `judge_metrics()` returns the list that each judge
   - A binding parsed from `--model-role grader="{model: mockllm/model, temperature: 0}"` carries `temperature=0` only. In a run, the judge calls see `temperature=0` from the binding, and `top_p=1`, `max_tokens=10500` and `reasoning_effort="high"` from upstream's settings (`test_a_bound_judge_keeps_its_settings_and_gets_upstreams_for_the_rest`). A binding that changes the model inherits these too, and can name any of them to override it.
   - The task's generation settings and the command line's sampling flags do not reach the judge. Inspect gives a model other than the one under test only the run's operational settings: `max_connections`, `adaptive_connections`, `max_retries`, `timeout`, `cache` and, unless the role sets it, `fail_on_refusal` (`Model._resolve_config`).
 
-- The template's example in `src/examples/llm_judge/llm_judge.py` lets the evaluated model grade itself when no grader is bound. Do not copy that wiring. Its test file is the pattern to reuse for mocking.
+- The template's example in `src/examples/llm_judge/llm_judge.py` lets the evaluated model grade itself when no grader is bound. Do not copy that wiring. Its test file was the pattern for mocking. Both were removed from this repo in T12; they are still in the template at v2.0.0, and `tests/morebench/` now shows the pattern.
 
 - Tests bind the role to a mock so no real judge is called:
 

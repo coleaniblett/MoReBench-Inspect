@@ -113,10 +113,11 @@ def test_both_targets_score_one_generation_twice(
     mocker: MockerFixture, public_row0: dict[str, Any], public_row405: dict[str, Any]
 ) -> None:
     # D-16: the default judges both texts, one scorer each, from the same generation.
+    # The final response's scorer comes first, so its `regular` is the run's first metric.
     judge = always("yes")
     log = run(mocker, judge, public_row0, public_row405)
     assert log.results is not None
-    assert [s.name for s in log.results.scores] == ["thinking_trace", "model_resp", "no_text"]
+    assert [s.name for s in log.results.scores] == ["model_resp", "thinking_trace", "no_text"]
     for result in log.results.scores[:2]:
         # Row 0 all yes is 55 / 61 (G8); row 405 all yes is 45 / 51.
         expected = (100 * 55 / 61 + 100 * 45 / 51) / 2
@@ -182,7 +183,7 @@ def test_every_metric_is_reported_for_both_texts(
     # and hard are those of the text it judged.
     log = run(mocker, always("yes"), public_row0, public_row405)
     assert log.results is not None
-    trace, response, coverage = log.results.scores
+    response, trace, coverage = log.results.scores
     expected_regular = (100 * 55 / 61 + 100 * 45 / 51) / 2
     for result, text in ((trace, TRACE), (response, RESPONSE)):
         metrics = {name: metric.value for name, metric in result.metrics.items()}
@@ -233,7 +234,7 @@ def test_a_sample_with_no_trace_is_in_the_share_and_not_in_the_trace_metrics(
     )
     assert_eval_success(log, expected_sample_count=2)
     assert log.results is not None
-    trace, response, coverage = log.results.scores
+    response, trace, coverage = log.results.scores
     assert trace.unscored_samples == 2
     assert all(math.isnan(metric.value) for metric in trace.metrics.values())
     assert list(trace.metrics) == [
@@ -427,11 +428,11 @@ def test_theory_reports_every_metric_by_theory_and_source_for_both_texts(
     log = run(mocker, judge, theory_row0, theory_row72, task=morebench_theory)
     assert log.results is not None
     assert [s.name for s in log.results.scores] == [
-        "theory_thinking_trace",
         "theory_model_resp",
+        "theory_thinking_trace",
         "no_text",
     ]
-    trace, response, coverage = log.results.scores
+    response, trace, coverage = log.results.scores
     # All yes: row 0 earns 54 of 60, row 72 earns 39 of 50.
     row0, row72 = 100 * 54 / 60, 100 * 39 / 50
     for result, text in ((trace, TRACE), (response, RESPONSE)):

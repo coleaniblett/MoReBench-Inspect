@@ -43,7 +43,7 @@ Requirement IDs (`R-…`) refer to [REQUIREMENTS.md](REQUIREMENTS.md).
 | D-21 | Responses with no final text     | Unscored when the final response is the judged text                                                                  | Deviation  | Approved |
 | D-22 | Optional fixes                   | Upstream's verdict reading and judge settings by default; each fix is an opt-in setting                              | Choice     | Approved |
 
-All approvals below were given by the owner on 2026-11-16, in task T0 unless noted. D-06, D-07 and D-08 were revisited the same day after the reasoning probe, and D-21 was added then. On 2026-11-17 the owner revised D-16 and added D-22, and after T5 ruled on API errors in D-04 and on a bound judge's settings in D-22, and on how D-07's share is produced.
+All approvals below were given by the owner on 2026-11-16, in task T0 unless noted. D-06, D-07 and D-08 were revisited the same day after the reasoning probe, and D-21 was added then. On 2026-11-17 the owner revised D-16 and added D-22, and after T5 ruled on API errors in D-04 and on a bound judge's settings in D-22, and on how D-07's share is produced. On 2026-11-18, after the T12 validity review, the owner set D-16's scorer order.
 
 ## The reasoning probe (2026-11-16)
 
@@ -95,7 +95,7 @@ What Inspect sent, read from the logged requests:
 - **T7 finding (2026-11-17): the prediction in "Why" does not hold for thinking traces.**
   - In the 50-scenario run on gpt-oss-120b (judge gpt-oss-120b with upstream's settings), 1,038 of 1,179 trace judgements (88%) were not exactly `yes` or `no`, in all 50 samples. For final responses it was 3 of 1,179 (0.3%).
   - Cause: gpt-oss's trace is written as a plan ("The user is requesting 'Provide corresponding reasoning and decision…' … We need to give a moral reasoning and decision"). The judge's own reasoning shows it taking that plan as its instructions ("We need to provide a response that includes that statement"), and it writes the moral advice instead of a verdict. Upstream's prompt does not delimit the response (D-14).
-  - Under the substring rule those essays credit most negative criteria (75–93% met) and few positive ones (26–32%). The more replies a sample had that were not `yes` or `no`, the lower its trace score (correlation −0.37).
+  - Under the substring rule the trace replies credit most negative criteria (75–93% met, by weight) and few positive ones (26–32%). These rates are over all 1,179 trace replies, not over the essays alone (T12). 89 of the 1,038 replies were the judge refusing ("I'm sorry, but I can't help with that."), which earns nothing under the substring rule, since it contains neither word. The more replies a sample had that were not `yes` or `no`, the lower its trace score (correlation −0.37).
   - Re-judging the same 50 traces with `strict_verdicts=True`: 651 of 1,179 criteria (55%) never got a readable verdict in four attempts, and 318 others needed a retry. Every sample had at least two such criteria, so all 50 were unscored. The strict reading is not a usable alternative for gpt-oss traces with upstream's prompt: the confusion is systematic, not noise.
   - What this means: the port still reproduces upstream, so "Effect on scores: none" stands. But a gpt-oss-120b trace score measures the judge's confusion as much as the trace. Whether the paper's 50.8 contains the same effect is not known; the paper's traces were 4.6 times shorter (D-19).
   - Not yet decided: whether to offer a delimited judge prompt as an opt-in fix (D-14, D-22). The owner keeps this open until they have read the judge's trace replies from the 50-scenario run (2026-11-17).
@@ -150,7 +150,7 @@ What Inspect sent, read from the logged requests:
 
 ### D-07 Responses with no thinking trace
 
-- **Upstream:** a model that returns no trace is judged on an empty string, which produces a meaningless non-zero score. Its length is 0, so the Hard score divides by zero.
+- **Upstream:** a model that returns no trace is judged on an empty string, which produces a meaningless non-zero score. Its length is 0, so if no sample in the run has a trace, the Hard score divides by zero (one empty trace among others only lowers the mean length).
 - **The port does:** when the judged text is the thinking trace and the trace is empty, the sample is unscored with the reason "no reasoning trace". No judge calls are made for it. The share of samples left unscored for want of judged text is reported, so a reader can see how much of the dataset a score covers.
 - **Evidence:** in the probe, Claude Sonnet 5.5 returned no reasoning block for one of its two scenarios. Adaptive thinking lets the model skip thinking, so on current Claude models an empty trace is an ordinary outcome and not a fault.
 - **Considered and rejected:** judging the empty string as upstream does; scoring the sample zero, which is a rule neither the paper nor the code has.
@@ -227,11 +227,12 @@ What Inspect sent, read from the logged requests:
 ### D-16 Default judged text
 
 - **Upstream:** `thinking_trace` for the main script, `model_resp` for Theory (R-JUDGE-4). Each script judges one text of an existing generation file, so both texts are judged from the same generations. The paper reports both texts for both benchmarks (Tables 6, 7, 9 and 10).
-- **The port does:** a `judge_target` task parameter, `both` by default for both tasks. With `both`, one generation is scored by two scorers, one for the thinking trace and one for the final response, each with its own metrics. `thinking_trace` or `model_resp` keeps only that scorer.
+- **The port does:** a `judge_target` task parameter, `both` by default for both tasks. With `both`, one generation is scored by two scorers, one for the thinking trace and one for the final response, each with its own metrics. `thinking_trace` or `model_resp` keeps only that scorer. With `both`, the final-response scorer comes first, so `model_resp/regular` (`theory_model_resp/regular` for Theory) is the first metric a run shows.
 - **Why:** one run then gives every number the paper reports for a model, from one set of generations, as upstream's two judge passes did.
 - **Effect on scores:** none. A sample makes twice as many judge calls by default.
 - **Considered and rejected:** keeping upstream's single-text defaults and adding `both` as an option, which was the first version of this decision.
-- **Status:** Approved. Revised by the owner on 2026-11-17.
+- **Why the final response comes first:** the T12 validity review found that a run's first metric was the trace score, which on gpt-oss-120b does not measure the trace (D-03), and that upstream's Theory script judges the final response by default.
+- **Status:** Approved. Revised by the owner on 2026-11-17. On 2026-11-18 the owner ruled that the final-response scorer comes first, for both tasks.
 
 ### D-17 Scope
 
@@ -271,7 +272,7 @@ What Inspect sent, read from the logged requests:
   - 5 of 50 final responses were the same refusal, "I'm sorry, but I can't help with that." Upstream judges them as written; they scored 5 to 32.
   - Cost at OpenRouter's list price for gpt-oss-120b ($0.15 in, $0.60 out per million tokens): $1.81 for the run, so about $18 per model for all 500 scenarios with both texts judged. That is above GL's $5 per model. Re-judging the 50 traces strictly made about 3,700 judge calls, roughly $3 by estimate; the rescored log does not record its own token use.
 
-- **MoReBench-Theory, T8 smoke run (2026-11-17).** One sample (Theory row 0, 23 criteria), same model and settings, both texts judged: final response 78.3 / 10,776 / 7.3, thinking trace 46.7 / 11,177 / 4.2. The paper prints no gpt-oss-120b row for Theory; its averages are 73.8 / 5,795.5 for final responses (Table 9) and 61.6 / 4,194.4 for traces (Table 10). Cost $0.048 at list price, so roughly $8 for all 150 rows with both texts judged, scaled by the mean of 25.57 criteria per row. Indicative only.
+- **MoReBench-Theory, T8 smoke run (2026-11-17).** One sample (Theory row 0, 23 criteria), same model and settings, both texts judged: final response 78.3 / 10,776 / 7.3, thinking trace 46.7 / 11,177 / 4.2. The paper's gpt-oss-120b rows for Theory are 76.7 / 6,824 / 11.2 for final responses (Table 9) and 68.2 / 1,648 / 41.4 for traces (Table 10). So this sample's trace was 6.8 times the paper's mean length and its final response 1.6 times. T12's validity review found that this entry first said the paper prints no such row; corrected on 2026-11-18. Cost $0.048 at list price, so roughly $8 for all 150 rows with both texts judged, scaled by the mean of 25.57 criteria per row. Indicative only.
 
 - **GL expectations:** `eval-report-workflow` budgets the full dataset or $5 per model, whichever is cheaper. The inspect_evals register asks for logs from two models on all samples.
 

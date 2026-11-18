@@ -352,14 +352,17 @@ def no_text() -> Scorer:
     return score
 
 
+# With both texts, the final response's scorer comes first, so its `regular` is the
+# first metric a run shows (D-16, the owner's ruling of 2026-11-18). The order changes
+# no score.
 JUDGE_SCORERS = {
-    "both": (thinking_trace, model_resp),
+    "both": (model_resp, thinking_trace),
     "thinking_trace": (thinking_trace,),
     "model_resp": (model_resp,),
 }
 
 THEORY_JUDGE_SCORERS = {
-    "both": (theory_thinking_trace, theory_model_resp),
+    "both": (theory_model_resp, theory_thinking_trace),
     "thinking_trace": (theory_thinking_trace,),
     "model_resp": (theory_model_resp,),
 }

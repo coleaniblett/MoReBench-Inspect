@@ -31,6 +31,8 @@ logs/
 # Agent artefacts: only the Scout scanners and the port's spec are tracked, never outputs
 agent_artefacts/*
 !agent_artefacts/morebench/
+# GL's validity review writes to agent_artefacts/<eval>_<version>/validity/; the checklist requires it
+!agent_artefacts/morebench_*/
 !agent_artefacts/trajectory_analysis/
 agent_artefacts/trajectory_analysis/*
 !agent_artefacts/trajectory_analysis/inspect_scout/

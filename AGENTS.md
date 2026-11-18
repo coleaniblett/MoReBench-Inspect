@@ -18,7 +18,6 @@ This project uses `uv`. Do not use `pip`, bare `python` or bare `pytest`.
 - `src/morebench/eval.yaml`: title, description, contributors, version and tasks. Edit it and run `make readmes`.
 - `src/morebench/README.md`: the eval's documentation, including the generated sections.
 - `tests/morebench/`: the tests.
-- `src/examples/`: worked examples (gpqa, agentic, llm_judge). They are not part of the eval. Run one by file path: `uv run inspect eval src/examples/<name>/<name>.py`. Remove them with `uvx copier update --defaults --data include_examples=false` followed by `uv sync`.
 - `agent_artefacts/trajectory_analysis/inspect_scout/`: Scout scanners for the transcript audit.
 
 ## Checks

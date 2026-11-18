@@ -9,8 +9,7 @@ eval_description: 'Inspect port of MoReBench: evaluating the moral reasoning pro
 eval_name: morebench
 github_owner: Generality-Labs
 github_username: ColeANiblett
-include_examples: true
-include_llm_judge_example: true
+include_examples: false
 layout: multi-eval
 license: MIT
 python_version: '3.12'

@@ -10,21 +10,21 @@ To start a task:
 
 Update this table at the end of each task.
 
-| Task | Title                               | GL `create-eval` phase | Status          |
-| ---- | ----------------------------------- | ---------------------- | --------------- |
-| T0   | Sign off the decisions (owner)      | 1.5, 2.7               | Done 2026-11-16 |
-| T1   | Verify the spec against upstream    | 1                      | Done 2026-11-16 |
-| T2   | Scaffold                            | 3                      | Done 2026-11-16 |
-| T3   | Prompts                             | 4.2                    | Done 2026-11-16 |
-| T4   | Dataset loading                     | 4.1                    | Done 2026-11-16 |
-| T5   | Scoring rule and judge scorer       | 4.3, 4.4               | Done 2026-11-17 |
-| T6   | Metrics                             | 4.3                    | Done 2026-11-17 |
-| T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17 |
-| T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17 |
-| T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Done 2026-11-17 |
-| T10  | README                              | 6.3                    | Done 2026-11-17 |
-| T11  | Parity run and evaluation report    | 6.4                    | Not started     |
-| T12  | Validity review and submission prep | 6.4                    | Not started     |
+| Task | Title                               | GL `create-eval` phase | Status                                               |
+| ---- | ----------------------------------- | ---------------------- | ---------------------------------------------------- |
+| T0   | Sign off the decisions (owner)      | 1.5, 2.7               | Done 2026-11-16                                      |
+| T1   | Verify the spec against upstream    | 1                      | Done 2026-11-16                                      |
+| T2   | Scaffold                            | 3                      | Done 2026-11-16                                      |
+| T3   | Prompts                             | 4.2                    | Done 2026-11-16                                      |
+| T4   | Dataset loading                     | 4.1                    | Done 2026-11-16                                      |
+| T5   | Scoring rule and judge scorer       | 4.3, 4.4               | Done 2026-11-17                                      |
+| T6   | Metrics                             | 4.3                    | Done 2026-11-17                                      |
+| T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17                                      |
+| T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17                                      |
+| T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Done 2026-11-17                                      |
+| T10  | README                              | 6.3                    | Done 2026-11-17                                      |
+| T11  | Parity run and evaluation report    | 6.4                    | Not started                                          |
+| T12  | Validity review and submission prep | 6.4                    | Done 2026-11-18; success criteria 5 to 7 wait on T11 |
 
 Also scheduled: the reasoning-effort test (`DECISIONS.md`, "Approved and scheduled"), once the pull request for `t05/scorer-and-metrics` is open. T11 waits for peer review, because the owner deferred D-19 until then.
 
@@ -214,6 +214,15 @@ ______________________________________________________________________
   3. Read the logs and compare with the paper's tables, at one decimal.
   4. Run the trajectory analysis with `/inspect-evals:check-trajectories-workflow`.
   5. Write the Evaluation Report section: results table, exact commands, dated model names, eval version, comparison with the paper, and an explanation of any gap.
+  - *Added in T12:* inspect_evals' checklist also asks for:
+
+    - a `report_config.yaml` committed beside `eval.yaml`;
+    - one trajectory analysis per model, at `agent_artefacts/trajectory_analysis/morebench/morebench_<model>_ANALYSIS.md`, a path `.gitignore` still ignores;
+    - logs of two models on every sample, for the register.
+
+  - *Also from T12's validity review:* before reporting any model's trace score, read a sample of its judge replies for answers that are not `yes` or `no` (D-03). Give the paper's gpt-oss-120b Theory rows (REQUIREMENTS.md § Reported results) beside Theory results.
+
+    See `agent_artefacts/morebench/submission/CHECKLIST.md` and `REGISTER_SUBMISSION.md`.
 - **Done when:** the report is in the README and success criterion 6 in SPEC.md §11 is met or its gap explained.
 - **Stop and ask if:** a result is outside the tolerance set in D-19.
 
@@ -222,9 +231,15 @@ ______________________________________________________________________
 - **Goal:** the repo is ready for GL review and the inspect_evals register.
 - **Load:** nothing beyond `SPEC.md`.
 - **Touch:** the repo root `README.md`; files changed by the template update.
+  - *Added in T12:*
+    - the skill's output, `agent_artefacts/morebench_1_A/validity/`;
+    - `agent_artefacts/morebench/submission/`, for the checklist walk and the register draft;
+    - `.gitignore`, so that the validity report is tracked, as the checklist requires;
+    - `ARCHITECTURE.md`, where it named a removed example;
+    - `scorers.py`, `test_morebench.py`, `src/morebench/README.md` and DECISIONS.md D-16, for the scorer order the owner chose after the validity review.
 - **Steps:**
   1. Run GL's `/inspect-evals:eval-validity-review` skill and act on its findings with the owner.
-  2. Remove the template examples with `uvx copier update --defaults --data include_examples=false`, then `uv sync`. Delete the Examples section of the root README by hand.
+  2. Remove the template examples with `uvx copier update --defaults --data include_examples=false --vcs-ref=:current:`, then `uv sync`. Without `--vcs-ref=:current:`, copier moves to the template's latest release. Read the diff before `uv sync`. Delete the Examples section of the root README by hand.
   3. Walk through inspect_evals' `EVALUATION_CHECKLIST.md` and list anything unmet.
   4. Draft the register submission.
 - **Done when:** all checks pass and every success criterion in SPEC.md §11 holds.
