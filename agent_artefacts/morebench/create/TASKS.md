@@ -26,6 +26,8 @@ Update this table at the end of each task.
 | T11  | Parity run and evaluation report    | 6.4                    | Not started     |
 | T12  | Validity review and submission prep | 6.4                    | Not started     |
 
+Also scheduled: the reasoning-effort test (`DECISIONS.md`, "Approved and scheduled"), once the pull request for `t05/scorer-and-metrics` is open. T11 waits for peer review, because the owner deferred D-19 until then.
+
 ## Rules for every task
 
 1. **Read** `SPEC.md` in full, then only the sections listed under the task's **Load**. Do not load the rest of the spec.
@@ -35,7 +37,7 @@ Update this table at the end of each task.
    1. *Checks.* Run all checks (SPEC.md §5) and report the actual results.
    2. *Self-check.* For each requirement and decision the task cites, state where it is met (file and line), or that it is not met and why.
    3. *Spec sync.* If anything learned contradicts or extends the spec, correct the spec file, add a line to the changelog in SPEC.md §13, and update the status table above.
-   4. *Report.* Say what was done, what was not, and what the owner needs to decide. Then stop. Do not start the next task.
+   4. *Report.* Say what was done and what was not. Bring decisions to the owner as `CLAUDE.md`'s "How to bring things to the owner" says: list the choices you made yourself under "Decided for you", and ask about the rest one at a time, never more than three waiting. Then stop. Do not start the next task.
 
 ______________________________________________________________________
 
@@ -164,6 +166,7 @@ ______________________________________________________________________
 
 - **Goal:** the Theory benchmark runs the same way.
 - **Needs:** D-16.
+- **Branch:** start from `t05/scorer-and-metrics`, as the owner said on 2026-11-17. Its pull request is held.
 - **Load:** `REQUIREMENTS.md § Dataset` (R-DATA-6 and R-DATA-7); `REQUIREMENTS.md § Scoring and metrics` (R-SCORE-6 and R-SCORE-9); `REQUIREMENTS.md § Task variants`; `ARCHITECTURE.md § Task interface`, `ARCHITECTURE.md § Metrics`.
 - **Touch:** `src/morebench/morebench.py`, `src/morebench/__init__.py`, `src/morebench/eval.yaml`, `tests/morebench/test_dataset.py`, `tests/morebench/test_morebench.py`.
 - **Steps:**
@@ -182,7 +185,7 @@ ______________________________________________________________________
   1. Run GL's `/inspect-evals:ensure-test-coverage` skill if it is loaded. Its coverage command needs `pytest-cov`, which is not installed: ask before adding it.
   2. Run `uv run inspect-evals-lint morebench` and list every finding with a recommendation.
   3. Fill the gaps found.
-- **Done when:** all checks pass and each remaining warning has the owner's decision.
+- **Done when:** all checks pass and each remaining warning has the owner's decision. Lint warning IECQ007 (ruff rule PLW1514 in the template-owned `pyproject.toml`) is deferred until after peer review (owner, 2026-11-17).
 
 ## T10 — README
 
@@ -200,7 +203,7 @@ ______________________________________________________________________
 ## T11 — Parity run and evaluation report
 
 - **Goal:** show how close the port is to the paper, and write the evaluation report.
-- **Needs:** D-19.
+- **Needs:** D-19, which the owner deferred until after peer review on 2026-11-17. T11 waits for that review.
 - **Load:** `REQUIREMENTS.md § Reported results`; `DECISIONS.md` D-05, D-06, D-19.
 - **Touch:** `src/morebench/README.md`; `DECISIONS.md`.
 - **Steps:**

@@ -38,7 +38,7 @@ Requirement IDs (`R-…`) refer to [REQUIREMENTS.md](REQUIREMENTS.md).
 | D-16 | Default judged text              | Both texts, each with its own scorer, for both tasks; `judge_target` narrows to one                                  | Choice     | Approved |
 | D-17 | Scope                            | Both datasets, both judged texts, public half only                                                                   | Choice     | Approved |
 | D-18 | Epochs                           | One                                                                                                                  | Choice     | Approved |
-| D-19 | Parity target and run budget     | Not yet decided                                                                                                      | Choice     | Open     |
+| D-19 | Parity target and run budget     | Deferred by the owner until after peer review                                                                        | Choice     | Open     |
 | D-20 | `eval.yaml` group                | `Safeguards`                                                                                                         | Choice     | Approved |
 | D-21 | Responses with no final text     | Unscored when the final response is the judged text                                                                  | Deviation  | Approved |
 | D-22 | Optional fixes                   | Upstream's verdict reading and judge settings by default; each fix is an opt-in setting                              | Choice     | Approved |
@@ -98,7 +98,7 @@ What Inspect sent, read from the logged requests:
   - Under the substring rule those essays credit most negative criteria (75–93% met) and few positive ones (26–32%). The more replies a sample had that were not `yes` or `no`, the lower its trace score (correlation −0.37).
   - Re-judging the same 50 traces with `strict_verdicts=True`: 651 of 1,179 criteria (55%) never got a readable verdict in four attempts, and 318 others needed a retry. Every sample had at least two such criteria, so all 50 were unscored. The strict reading is not a usable alternative for gpt-oss traces with upstream's prompt: the confusion is systematic, not noise.
   - What this means: the port still reproduces upstream, so "Effect on scores: none" stands. But a gpt-oss-120b trace score measures the judge's confusion as much as the trace. Whether the paper's 50.8 contains the same effect is not known; the paper's traces were 4.6 times shorter (D-19).
-  - Not yet decided: whether to offer a delimited judge prompt as an opt-in fix (D-14, D-22). That is the owner's call.
+  - Not yet decided: whether to offer a delimited judge prompt as an opt-in fix (D-14, D-22). The owner keeps this open until they have read the judge's trace replies from the 50-scenario run (2026-11-17).
 
 ### D-04 Judge failures
 
@@ -279,7 +279,7 @@ What Inspect sent, read from the logged requests:
 
 - **Recommendation for models:** include gpt-oss-120b as a model under test. It has open weights, so it is the least likely to have drifted.
 
-- **Status:** Open. In T0 the owner chose to leave it open until T11, when a five-sample cost estimate exists. Nothing before T11 depends on it.
+- **Status:** Open. In T0 the owner chose to leave it open until T11, when a five-sample cost estimate exists. Nothing before T11 depends on it. On 2026-11-17 the owner deferred it, and with it T11, until after peer review. The reasoning-effort test was approved meanwhile (Approved and scheduled, below).
 
 ### D-20 `eval.yaml` group
 
@@ -313,6 +313,27 @@ What Inspect sent, read from the logged requests:
 
 ## Open questions for the owner
 
-1. D-19: models, tolerance and budget for the parity run. (blocks T11)
-2. D-03, D-14: whether to offer a judge prompt that delimits the judged text, as an opt-in fix under D-22, now that the judge mostly fails to return a verdict on gpt-oss traces. (blocks nothing; affects how T11 reads trace scores)
-3. D-19: whether to test the reasoning-effort hypothesis for gpt-oss's long traces: a few scenarios generated with upstream's top-level `reasoning_effort` field and with Inspect's `reasoning.effort`, comparing trace lengths. Costs cents. (informs T11)
+At most three items wait on the owner at a time (`CLAUDE.md`, "How to bring things to the owner").
+
+1. Whether to offer a judge prompt that fences off the judged text, as an opt-in fix, now that the judge mostly fails to give a verdict on gpt-oss traces (D-03, D-14, D-22). Open until the owner has read the judge's trace replies from the 50-scenario run, on 2026-11-17. Blocks nothing; it affects how trace scores can be read.
+
+## Approved and scheduled
+
+- Test the reasoning-effort explanation for gpt-oss's long traces (D-06, D-19): generate a few scenarios with upstream's top-level `reasoning_effort` field and with Inspect's `reasoning.effort`, and compare trace lengths. Costs cents. Approved by the owner on 2026-11-17, to run once the pull request for `t05/scorer-and-metrics` is open. The owner is holding that pull request while T8 (Theory) builds on the branch.
+
+## Deferred until after peer review
+
+The owner deferred these on 2026-11-17. They are not waiting on the owner, and are not raised again before peer review.
+
+- Models, tolerance and budget for the parity run (D-19). T11 depends on it, so T11 waits too.
+- Lint warning IECQ007: enabling ruff rule PLW1514 in the template-owned `pyproject.toml` (T9).
+- Dependabot's GitHub Actions branch on the remote, `dependabot/github_actions/actions-7313d4f700`.
+
+## Settled on 2026-11-17 from the review
+
+Recorded here because they were raised as open items in the progress review. Each is the recommendation the owner approved.
+
+- `openai` is a runtime dependency, so a plain install can run the default judge (ARCHITECTURE.md § Dependencies).
+- The no-text shares stay on 0 to 1, as shares rather than scores (ARCHITECTURE.md § Metrics).
+- Breakdown entries appear only for the categories, dimensions and weights present among the scored samples (ARCHITECTURE.md § Metrics).
+- One branch per working day instead of one per task (SPEC.md §9).
