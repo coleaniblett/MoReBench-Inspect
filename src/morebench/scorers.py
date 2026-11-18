@@ -2,9 +2,10 @@
 
 MoReBench judges two texts from each reply: the thinking trace and the final response.
 Each has its own scorer, named after upstream's name for the text, so every metric in
-the log says which text it describes. A scorer asks the judge about one rubric
-criterion per call and scores the replies with the rule in `scoring.py`. A third
-scorer, `no_text`, calls no model: it counts the samples with no text to judge.
+the log says which text it describes; MoReBench-Theory's two carry a `theory_` prefix.
+A scorer asks the judge about one rubric criterion per call and scores the replies with
+the rule in `scoring.py`. A third scorer, `no_text`, calls no model: it counts the
+samples with no text to judge.
 """
 
 from collections.abc import Callable
@@ -26,6 +27,7 @@ from inspect_evals_utils.scorers import GRADER_FAILED, NO_RESPONSE, VerdictParse
 
 from morebench.prompts import judge_prompt
 from morebench.scoring import (
+    THEORY_CATEGORY_KEYS,
     is_fulfilled,
     is_standard_reply,
     judge_metrics,
@@ -284,6 +286,46 @@ def model_resp(strict_verdicts: bool = False) -> Scorer:
     return score
 
 
+# MoReBench-Theory breaks its score down by other categories (R-SCORE-6). A task's
+# `metrics` would replace the metrics of every scorer in it, `no_text` included, and
+# Inspect has no public way to change one scorer's, so Theory has scorers of their own.
+# They judge exactly as `thinking_trace` and `model_resp` do; only the metrics differ.
+
+
+@scorer(metrics=judge_metrics(THEORY_CATEGORY_KEYS))
+def theory_thinking_trace(strict_verdicts: bool = False) -> Scorer:
+    """Judge the thinking trace of a MoReBench-Theory reply against the sample's rubric.
+
+    Args:
+        strict_verdicts: Read the judge's replies strictly (D-22) instead of with
+            upstream's substring rule.
+    """
+
+    async def score(state: TaskState, target: Target) -> Score:
+        grader = get_model(role=GRADER_ROLE, default=DEFAULT_GRADER, config=DEFAULT_GRADER_CONFIG)
+        return await judge_text(state, grader, extract_trace, NO_TRACE_EXPLANATION, strict_verdicts)
+
+    return score
+
+
+@scorer(metrics=judge_metrics(THEORY_CATEGORY_KEYS))
+def theory_model_resp(strict_verdicts: bool = False) -> Scorer:
+    """Judge the final response of a MoReBench-Theory reply against the sample's rubric.
+
+    Args:
+        strict_verdicts: Read the judge's replies strictly (D-22) instead of with
+            upstream's substring rule.
+    """
+
+    async def score(state: TaskState, target: Target) -> Score:
+        grader = get_model(role=GRADER_ROLE, default=DEFAULT_GRADER, config=DEFAULT_GRADER_CONFIG)
+        return await judge_text(
+            state, grader, extract_response, NO_RESPONSE_EXPLANATION, strict_verdicts
+        )
+
+    return score
+
+
 @scorer(metrics=[no_text_share()])
 def no_text() -> Scorer:
     """Record, for each judged text, whether the reply had none. Makes no model calls.
@@ -316,13 +358,28 @@ JUDGE_SCORERS = {
     "model_resp": (model_resp,),
 }
 
+THEORY_JUDGE_SCORERS = {
+    "both": (theory_thinking_trace, theory_model_resp),
+    "thinking_trace": (theory_thinking_trace,),
+    "model_resp": (theory_model_resp,),
+}
 
-def judge_scorers(judge_target: JudgeTarget, strict_verdicts: bool) -> list[Scorer]:
+
+def judge_scorers(
+    judge_target: JudgeTarget, strict_verdicts: bool, theory: bool = False
+) -> list[Scorer]:
     """Return the scorers for a judge target: one per judged text (D-16).
+
+    Args:
+        judge_target: `both`, `thinking_trace` or `model_resp`.
+        strict_verdicts: Read the judge's replies strictly (D-22).
+        theory: Return MoReBench-Theory's scorers, with its breakdowns, instead of the
+            main benchmark's.
 
     Raises:
         ValueError: If the judge target is not one of `JudgeTarget`.
     """
-    if judge_target not in JUDGE_SCORERS:
-        raise ValueError(f"judge_target must be one of {list(JUDGE_SCORERS)}, not {judge_target!r}")
-    return [make(strict_verdicts) for make in JUDGE_SCORERS[judge_target]]
+    table = THEORY_JUDGE_SCORERS if theory else JUDGE_SCORERS
+    if judge_target not in table:
+        raise ValueError(f"judge_target must be one of {list(table)}, not {judge_target!r}")
+    return [make(strict_verdicts) for make in table[judge_target]]

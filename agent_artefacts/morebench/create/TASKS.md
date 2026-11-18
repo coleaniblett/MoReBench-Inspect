@@ -20,7 +20,7 @@ Update this table at the end of each task.
 | T5   | Scoring rule and judge scorer       | 4.3, 4.4               | Done 2026-11-17 |
 | T6   | Metrics                             | 4.3                    | Done 2026-11-17 |
 | T7   | Smoke test, small run and retro     | 4.5–4.8                | Done 2026-11-17 |
-| T8   | Add `morebench_theory`              | 4                      | Not started     |
+| T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17 |
 | T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Not started     |
 | T10  | README                              | 6.3                    | Not started     |
 | T11  | Parity run and evaluation report    | 6.4                    | Not started     |
@@ -169,8 +169,9 @@ ______________________________________________________________________
 - **Branch:** start from `t05/scorer-and-metrics`, as the owner said on 2026-11-17. Its pull request is held.
 - **Load:** `REQUIREMENTS.md § Dataset` (R-DATA-6 and R-DATA-7); `REQUIREMENTS.md § Scoring and metrics` (R-SCORE-6 and R-SCORE-9); `REQUIREMENTS.md § Task variants`; `ARCHITECTURE.md § Task interface`, `ARCHITECTURE.md § Metrics`.
 - **Touch:** `src/morebench/morebench.py`, `src/morebench/__init__.py`, `src/morebench/eval.yaml`, `tests/morebench/test_dataset.py`, `tests/morebench/test_morebench.py`.
+  - *Added in T8:* `src/morebench/scorers.py`, `src/morebench/scoring.py` and `tests/morebench/test_scoring.py`, for Theory's own judge scorers (`ARCHITECTURE.md § Scorer design`), and the generated sections of `src/morebench/README.md`.
 - **Steps:**
-  1. Add the task with its own default judge target and its breakdowns by theory and source.
+  1. Add the task with the default judge target from D-16 (`both`, as for `morebench`) and its breakdowns by theory and source.
   2. Add it to `eval.yaml` with `dataset_samples: 150` and regenerate the README sections.
   3. Add dataset tests for the theory config and end-to-end tests.
   4. **Checkpoint.** A `--limit 1` real run, reviewed as in T7.

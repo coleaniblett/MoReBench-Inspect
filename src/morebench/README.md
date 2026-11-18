@@ -19,13 +19,14 @@ Then run evaluations:
 
 ```bash
 uv run inspect eval morebench/morebench --model openai/gpt-5-nano
+uv run inspect eval morebench/morebench_theory --model openai/gpt-5-nano
 ```
 
 You can also import tasks as Python objects:
 
 ```python
 from inspect_ai import eval
-from morebench import morebench
+from morebench import morebench, morebench_theory
 eval(morebench)
 ```
 
@@ -56,7 +57,7 @@ You can control a variety of options from the command line. For example:
 
 ```bash
 uv run inspect eval morebench/morebench --limit 10
-uv run inspect eval morebench/morebench --max-connections 10
+uv run inspect eval morebench/morebench_theory --max-connections 10
 uv run inspect eval morebench/morebench --temperature 0.5
 ```
 
@@ -66,7 +67,7 @@ See `uv run inspect eval --help` for all available options.
 <!-- Parameters: Automatically Generated -->
 ## Parameters
 
-### `morebench`
+### `morebench`, `morebench_theory`
 
 - `judge_target` (Literal['both', 'thinking_trace', 'model_resp']): Which text the judge reads: `both` (the default), scored once for the thinking trace and once for the final response from the same generation; or only `thinking_trace` or `model_resp`. (default: `'both'`)
 - `strict_verdicts` (bool): Read the judge's replies strictly, accepting only a reply that leads with yes or no, instead of with the original's substring rule. A reply the strict reading cannot read leaves the sample unscored. (default: `False`)

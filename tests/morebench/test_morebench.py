@@ -1,8 +1,9 @@
 import math
+from collections.abc import Callable
 from typing import Any
 
 import pytest
-from inspect_ai import eval
+from inspect_ai import Task, eval
 from inspect_ai.dataset import MemoryDataset
 from inspect_ai.log import EvalLog
 from inspect_ai.model import (
@@ -16,10 +17,10 @@ from inspect_ai.model import (
 from pytest_inspect_evals.assertions import assert_eval_success
 from pytest_mock import MockerFixture
 
-from morebench import morebench
-from morebench.dataset import PUBLIC_CONFIG, record_to_sample
+from morebench import morebench, morebench_theory
+from morebench.dataset import PUBLIC_CONFIG, THEORY_CONFIG, record_to_sample
 from morebench.morebench import EVAL_VERSION
-from morebench.prompts import NEUTRAL_TEMPLATE
+from morebench.prompts import NEUTRAL_TEMPLATE, generation_prompt
 from morebench.scorers import DEFAULT_GRADER, DEFAULT_GRADER_CONFIG, GRADER_ROLE
 from tests.morebench.conftest import Judge, always
 
@@ -47,10 +48,16 @@ def model_under_test(trace: str = TRACE, response: str = RESPONSE) -> Any:
     return get_model("mockllm/model", custom_outputs=lambda *args: reply, memoize=False)
 
 
-def run(mocker: MockerFixture, judge: Judge, *rows: dict[str, Any], **task_args: Any) -> EvalLog:
+def run(
+    mocker: MockerFixture,
+    judge: Judge,
+    *rows: dict[str, Any],
+    task: Callable[..., Task] = morebench,
+    **task_args: Any,
+) -> EvalLog:
     use_rows(mocker, *rows)
     [log] = eval(
-        tasks=morebench(**task_args),
+        tasks=task(**task_args),
         model=model_under_test(),
         model_roles={GRADER_ROLE: judge.model()},
         display="none",
@@ -59,10 +66,13 @@ def run(mocker: MockerFixture, judge: Judge, *rows: dict[str, Any], **task_args:
     return log
 
 
-def test_generation_settings(mocker: MockerFixture, public_row0: dict[str, Any]) -> None:
-    # DECISIONS.md D-06.
+@pytest.mark.parametrize("task", [morebench, morebench_theory])
+def test_generation_settings(
+    mocker: MockerFixture, public_row0: dict[str, Any], task: Callable[..., Task]
+) -> None:
+    # DECISIONS.md D-06. Upstream's Theory script copies the main one's settings.
     use_rows(mocker, public_row0)
-    config = morebench().config
+    config = task().config
     assert config.max_tokens == 10500
     assert config.reasoning_effort == "high"
     assert config.reasoning_summary == "auto"
@@ -294,15 +304,18 @@ def test_a_bound_judge_keeps_its_settings_and_gets_upstreams_for_the_rest(
         assert config.reasoning_summary is None
 
 
+@pytest.mark.parametrize(
+    ("task", "row"), [(morebench, "public_row0"), (morebench_theory, "theory_row0")]
+)
 def test_an_unbound_judge_is_the_default_with_upstream_settings(
-    mocker: MockerFixture, public_row0: dict[str, Any]
+    mocker: MockerFixture, request: pytest.FixtureRequest, task: Callable[..., Task], row: str
 ) -> None:
     # D-05: with no binding, the scorer asks for upstream's judge and settings. The
     # mock stands in for the OpenRouter model, so nothing leaves the machine.
     judge_model = always("yes").model()
     resolve = mocker.patch("morebench.scorers.get_model", return_value=judge_model)
-    use_rows(mocker, public_row0)
-    [log] = eval(tasks=morebench(), model=model_under_test(), display="none")
+    use_rows(mocker, request.getfixturevalue(row))
+    [log] = eval(tasks=task(), model=model_under_test(), display="none")
     assert_eval_success(log, expected_sample_count=1)
     assert resolve.call_count == 2
     resolve.assert_called_with(
@@ -310,12 +323,13 @@ def test_an_unbound_judge_is_the_default_with_upstream_settings(
     )
 
 
+@pytest.mark.parametrize("task", [morebench, morebench_theory])
 def test_an_unknown_judge_target_fails_at_task_creation(
-    mocker: MockerFixture, public_row0: dict[str, Any]
+    mocker: MockerFixture, public_row0: dict[str, Any], task: Callable[..., Task]
 ) -> None:
     use_rows(mocker, public_row0)
     with pytest.raises(ValueError, match="judge_target"):
-        morebench(judge_target=UNKNOWN_TARGET)
+        task(judge_target=UNKNOWN_TARGET)
 
 
 @pytest.mark.dataset_download
@@ -344,6 +358,154 @@ def test_end_to_end_with_mock_model_on_the_real_dataset() -> None:
             "theory",
             "row_index",
         }
+    # mockllm returns no reasoning, so only the final response is judged.
+    rubric_sizes = sum(len(sample.metadata["rubric"]) for sample in log.samples)
+    assert len(judge.calls) == rubric_sizes
+
+
+# ---- morebench_theory ----------------------------------------------------------------
+
+
+def test_theory_end_to_end_with_mock_model(
+    mocker: MockerFixture, theory_row0: dict[str, Any]
+) -> None:
+    load = use_rows(mocker, theory_row0)
+    judge = always("yes")
+    [log] = eval(
+        tasks=morebench_theory(),
+        model="mockllm/model",
+        model_roles={GRADER_ROLE: judge.model()},
+        display="none",
+    )
+    load.assert_called_once_with(THEORY_CONFIG)
+    assert_eval_success(log, expected_sample_count=1)
+    assert log.samples is not None
+    [sample] = log.samples
+    assert sample.id == "morebench_a1b9b874"
+    # The theory template for the row's theory (R-TASK-2, R-GEN-3).
+    assert sample.input == generation_prompt(theory_row0["DILEMMA"], "Scanlonian Contractualism")
+    assert [message.role for message in sample.messages] == ["user", "assistant"]
+    # mockllm's default reply has no reasoning block (D-07). Row 0 has 23 criteria, two
+    # of them negative.
+    assert sample.scores is not None
+    assert sample.scores["theory_thinking_trace"].explanation == "no reasoning trace"
+    assert sample.scores["theory_model_resp"].explanation == "21 of 23 criteria fulfilled"
+    assert sample.scores["no_text"].value == {"thinking_trace": 1.0, "model_resp": 0.0}
+    assert len(judge.calls) == 23
+
+
+# The metric names the log shows for one judged text of Theory rows 0 and 72: both are
+# expert-written cases, under Scanlonian contractualism and act utilitarianism, and
+# together they have five of the six dimensions and the weights -3, -2, 1, 2 and 3.
+THEORY_ROWS_0_AND_72_METRICS = [
+    "regular",
+    "stderr",
+    "length",
+    "hard",
+    "Act Utilitarianism",
+    "Scanlonian Contractualism",
+    "expert_written",
+    "dimension_clear_process",
+    "dimension_harmless_outcome",
+    "dimension_helpful_outcome",
+    "dimension_identifying",
+    "dimension_logical_process",
+    "weight_-3",
+    "weight_-2",
+    "weight_1",
+    "weight_2",
+    "weight_3",
+]
+
+
+def test_theory_reports_every_metric_by_theory_and_source_for_both_texts(
+    mocker: MockerFixture, theory_row0: dict[str, Any], theory_row72: dict[str, Any]
+) -> None:
+    # D-16: both texts by default. R-SCORE-6: Theory's breakdowns are by theory and by
+    # source, not by role or type.
+    judge = always("yes")
+    log = run(mocker, judge, theory_row0, theory_row72, task=morebench_theory)
+    assert log.results is not None
+    assert [s.name for s in log.results.scores] == [
+        "theory_thinking_trace",
+        "theory_model_resp",
+        "no_text",
+    ]
+    trace, response, coverage = log.results.scores
+    # All yes: row 0 earns 54 of 60, row 72 earns 39 of 50.
+    row0, row72 = 100 * 54 / 60, 100 * 39 / 50
+    for result, text in ((trace, TRACE), (response, RESPONSE)):
+        metrics = {name: metric.value for name, metric in result.metrics.items()}
+        assert list(metrics) == THEORY_ROWS_0_AND_72_METRICS
+        assert result.scored_samples == 2
+        assert metrics["regular"] == pytest.approx((row0 + row72) / 2)
+        assert metrics["length"] == len(text)
+        assert metrics["hard"] == pytest.approx((row0 + row72) / 2 * 1000 / len(text))
+        assert metrics["Scanlonian Contractualism"] == pytest.approx(row0)
+        assert metrics["Act Utilitarianism"] == pytest.approx(row72)
+        assert metrics["expert_written"] == pytest.approx((row0 + row72) / 2)
+        assert metrics["weight_-2"] == 0
+        assert metrics["weight_3"] == 100
+    assert {name: m.value for name, m in coverage.metrics.items()} == {
+        "thinking_trace": 0.0,
+        "model_resp": 0.0,
+    }
+    # One generation per sample, then one judge call per criterion for each text.
+    assert len(judge.calls) == 2 * (23 + 21)
+
+
+@pytest.mark.parametrize(
+    ("judge_target", "judged"), [("thinking_trace", TRACE), ("model_resp", RESPONSE)]
+)
+def test_theory_with_a_single_judge_target(
+    mocker: MockerFixture, theory_row0: dict[str, Any], judge_target: str, judged: str
+) -> None:
+    judge = always("no")
+    log = run(mocker, judge, theory_row0, task=morebench_theory, judge_target=judge_target)
+    assert log.results is not None
+    result, coverage = log.results.scores
+    assert result.name == f"theory_{judge_target}"
+    # All no: only the two -3 criteria are credited, 6 of 60.
+    assert result.metrics["regular"].value == pytest.approx(100 * 6 / 60)
+    assert coverage.name == "no_text"
+    assert len(judge.calls) == 23
+    assert all(p.startswith(f"Reasoning Response:{judged}\n") for p in judge.prompts)
+
+
+def test_theory_strict_verdicts_reach_the_scorers(
+    mocker: MockerFixture, theory_row0: dict[str, Any]
+) -> None:
+    # D-22, as for the main benchmark.
+    log = run(
+        mocker, always("I do not know"), theory_row0, task=morebench_theory, strict_verdicts=True
+    )
+    assert log.results is not None
+    *judged, _ = log.results.scores
+    assert [result.unscored_samples for result in judged] == [1, 1]
+    assert log.samples is not None
+    assert log.samples[0].scores is not None
+    assert log.samples[0].scores["theory_model_resp"].reason == "grader_failed"
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
+def test_theory_end_to_end_with_mock_model_on_the_real_dataset() -> None:
+    # The judge is bound to a mock, so no judge API is called.
+    judge = always("yes")
+    [log] = eval(
+        tasks=morebench_theory(),
+        model="mockllm/model",
+        model_roles={GRADER_ROLE: judge.model()},
+        limit=5,
+        display="none",
+    )
+    assert_eval_success(log, expected_sample_count=5)
+    assert log.eval.dataset.samples == 150
+    assert log.samples is not None
+    for sample in log.samples:
+        theory = sample.metadata["theory"]
+        assert isinstance(sample.input, str)
+        assert sample.input.startswith(generation_prompt("", theory))
     # mockllm returns no reasoning, so only the final response is judged.
     rubric_sizes = sum(len(sample.metadata["rubric"]) for sample in log.samples)
     assert len(judge.calls) == rubric_sizes

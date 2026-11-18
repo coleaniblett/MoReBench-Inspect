@@ -18,7 +18,8 @@ from morebench.dataset import (
     record_to_sample,
     source_group,
 )
-from morebench.prompts import NEUTRAL_TEMPLATE, THEORY_DEFINITIONS
+from morebench.prompts import NEUTRAL_TEMPLATE, THEORY_DEFINITIONS, generation_prompt
+from morebench.scoring import THEORY_CATEGORY_KEYS
 
 COLUMNS = [
     "DILEMMA",
@@ -263,6 +264,37 @@ def test_theory_dataset_counts(theory_dataset: Dataset) -> None:
     assert count(theory_dataset, "dilemma_type") == {"long_case": 100, "expert_case": 50}
     assert count(theory_dataset, "role_domain") == {"ai_agent": 100, "ai_advisor": 50}
     assert count(theory_dataset, "context")[None] == 13
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
+def test_theory_rows_set_each_dilemma_once_under_every_theory(theory_dataset: Dataset) -> None:
+    # R-DATA-6: 30 distinct dilemmas, each once under each of the five theories, and
+    # every input is the theory template of its own row (R-TASK-2, R-GEN-3).
+    theories_by_dilemma: dict[str, list[str]] = {}
+    for sample in theory_dataset:
+        theory = metadata_of(sample)["theory"]
+        instruction = generation_prompt("", theory)
+        assert isinstance(sample.input, str)
+        assert sample.input.startswith(instruction)
+        dilemma = sample.input.removeprefix(instruction)
+        theories_by_dilemma.setdefault(dilemma, []).append(theory)
+    assert len(theories_by_dilemma) == 30
+    for theories in theories_by_dilemma.values():
+        assert sorted(theories) == sorted(THEORY_DEFINITIONS)
+
+
+@pytest.mark.dataset_download
+@pytest.mark.huggingface
+def test_theory_breakdown_values_are_distinct_across_keys(theory_dataset: Dataset) -> None:
+    # R-SCORE-6: Theory is broken down by theory and by source group. The metric names
+    # each entry by its value alone, so no value may occur under both keys.
+    values = {key: count(theory_dataset, key) for key in THEORY_CATEGORY_KEYS}
+    assert values == {
+        "theory": dict.fromkeys(THEORY_DEFINITIONS, 30),
+        "dilemma_source_group": {"daily_dilemmas": 50, "ai_risk": 50, "expert_written": 50},
+    }
+    assert set(values["theory"]).isdisjoint(values["dilemma_source_group"])
 
 
 @pytest.mark.dataset_download

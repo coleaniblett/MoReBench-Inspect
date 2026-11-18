@@ -9,3 +9,5 @@ version: "1-A"
 tasks:
   - name: morebench
     dataset_samples: 500
+  - name: morebench_theory
+    dataset_samples: 150

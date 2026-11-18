@@ -1,3 +1,3 @@
-from morebench.morebench import morebench
+from morebench.morebench import morebench, morebench_theory
 
-__all__ = ["morebench"]
+__all__ = ["morebench", "morebench_theory"]
