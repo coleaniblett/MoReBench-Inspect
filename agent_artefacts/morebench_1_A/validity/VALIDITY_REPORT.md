@@ -2,6 +2,11 @@
 
 **Version**: 1-A (tasks `morebench` and `morebench_theory`) **Date**: 2026-11-18 **Group**: Safeguards
 
+**Correction note (2026-11-23).** Added after the review; the review below is unchanged.
+
+- Scorer order: since T12 the final-response scorer comes first in both tasks (`scorers.py` L365-L375). Where the review says the trace scorer is first (Summary, Scoring Approach, Scoring finding 2), it describes the code as reviewed on 2026-11-18.
+- Output lengths (Scoring finding 4): a 10-scenario test on 2026-11-23 found that gpt-oss-120b's traces at medium effort, or with no effort sent, match the paper's length, and that the two ways of sending effort high give about the same lengths today. Indicative only, and why the paper matches default effort is unverified (DECISIONS.md D-06, D-05).
+
 Each finding is labelled **inherited** (the original benchmark does the same and the port keeps it) or **introduced** (the port differs from upstream, or the problem is in the port's own code or docs). The detailed evidence is in `NOTES.md` beside this file.
 
 ## Summary

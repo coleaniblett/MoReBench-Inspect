@@ -2,6 +2,11 @@
 
 Working notes for the `eval-validity-review` skill, run on 2026-11-18. The report is `VALIDITY_REPORT.md` beside this file.
 
+**Correction note (2026-11-23).** Added after the review; the notes below are unchanged.
+
+- Scorer order: § 1.1 and the "Scorer order" bullet in Phase 5 say the trace scorer is first. That was the code on 2026-11-18. Since T12 the final-response scorer comes first (`scorers.py` L365-L375).
+- "Could not check", second item: a 10-scenario test on 2026-11-23 found that OpenRouter today treats upstream's top-level `reasoning_effort` and Inspect's `reasoning.effort` alike, and that gpt-oss-120b's traces match the paper's length at medium effort (DECISIONS.md D-06). Whether OpenRouter honoured the top-level field when the paper ran is still unknown.
+
 Each finding is labelled **inherited** (upstream does the same and the port keeps it) or **introduced** (the port differs from upstream, or the problem is in the port's own code or docs).
 
 ## Sources used

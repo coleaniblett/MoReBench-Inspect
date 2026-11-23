@@ -11,9 +11,13 @@ from morebench.scorers import JudgeTarget, judge_scorers, no_text
 # The version comes from eval.yaml, the file beside this module.
 EVAL_VERSION = load_eval_version(__file__)
 
-# Generation settings (DECISIONS.md D-06). The token limit is the paper's. Effort high
-# is what the original sends to OpenAI and OpenRouter. No reasoning-token budget is set
-# here: Inspect raises an error for one on Claude 4.7 and later.
+# Generation settings (DECISIONS.md D-06). The token limit is the paper's, and upstream's
+# code sends the same. Effort high is what upstream's OpenRouter path hard-codes; for
+# OpenAI upstream's effort is the `-re` flag, which defaults to `medium` and which its
+# README examples set to `high`. The summary setting is upstream's OpenAI request. All
+# are kept for fidelity: at medium effort gpt-oss-120b's traces match the paper's length,
+# and at high they are about four times it (D-06, T11 effort test). No reasoning-token
+# budget is set here: Inspect raises an error for one on Claude 4.7 and later.
 MAX_TOKENS = 10500
 REASONING_EFFORT = "high"
 REASONING_SUMMARY = "auto"

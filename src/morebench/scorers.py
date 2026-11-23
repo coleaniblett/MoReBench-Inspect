@@ -43,15 +43,18 @@ JudgeTarget = Literal["both", "thinking_trace", "model_resp"]
 # The judge (DECISIONS.md D-05): upstream's model and settings, from
 # morebench/morebench at e6689bb (MIT), run_best_judge_on_responses.py L23 and
 # utils.py L197-L215. Inspect merges these settings beneath a bound `grader` role, so a
-# setting the binding names wins and every other one is upstream's (D-22).
+# setting the binding names wins and every other one is upstream's (D-22). Inspect sends
+# the effort as `reasoning.effort` where upstream sends a top-level `reasoning_effort`
+# (D-05). No OpenRouter provider is pinned, as upstream pins none (D-24).
 GRADER_ROLE = "grader"
 DEFAULT_GRADER = "openrouter/openai/gpt-oss-120b"
 DEFAULT_GRADER_CONFIG = GenerateConfig(
     temperature=1, top_p=1, max_tokens=10500, reasoning_effort="high"
 )
 
-# Further attempts after an empty reply, as upstream retries a None reply:
-# run_best_judge_on_responses.py L82-L85 (D-04).
+# Further attempts after an empty reply, on both tasks. Three is the count of upstream's
+# main judge script, which retries only a None reply (run_best_judge_on_responses.py
+# L82-L85); its Theory judge script does not retry (D-04).
 JUDGE_RETRIES = 3
 
 # Explanations for a sample whose judged text is empty (D-07, D-21).
@@ -76,8 +79,9 @@ def extract_trace(message: ChatMessageAssistant) -> str:
 
     The texts of the reasoning blocks are joined in order, one per line, and stripped.
     """
-    # Follows morebench/morebench at e6689bb (MIT), utils.py L112-L126: each thinking
-    # block followed by a newline, then stripped.
+    # Follows morebench/morebench at e6689bb (MIT), utils.py L112-L126, upstream's
+    # Anthropic path: each thinking block followed by a newline, then stripped. Upstream's
+    # OpenRouter and OpenAI paths do not strip; the port strips for every provider (D-08).
     if isinstance(message.content, str):
         return ""
     texts = [
@@ -92,8 +96,9 @@ def extract_response(message: ChatMessageAssistant) -> str:
     The text blocks are concatenated with nothing between them and stripped. Reasoning
     is never included.
     """
-    # Follows morebench/morebench at e6689bb (MIT), utils.py L112-L122. `message.text`
-    # is not used because it puts a newline between text blocks.
+    # Follows morebench/morebench at e6689bb (MIT), utils.py L112-L122, upstream's
+    # Anthropic path, which also strips the response; its OpenRouter and OpenAI paths do
+    # not (D-08). `message.text` is not used because it puts a newline between text blocks.
     if isinstance(message.content, str):
         return message.content.strip()
     texts = [block.text for block in message.content if isinstance(block, ContentText)]
@@ -145,6 +150,8 @@ async def ask_judge(grader: Model, prompt: str, strict: bool) -> JudgeReply:
             output = await grader.generate(prompt)
         else:
             output = await grader.generate(prompt, cache=False)
+        # The reply's text blocks only, never its reasoning, as upstream reads
+        # `message.content` (D-03).
         text = output.completion
         problem = reply_problem(text, strict)
         if problem is None:

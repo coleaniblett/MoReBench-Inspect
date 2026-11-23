@@ -32,10 +32,12 @@ PERCENT = 100
 # morebench/morebench at e6689bb (MIT), calculate_morebench.py L31. Upstream cuts each
 # value to its first two `_`-separated tokens (utils.py L332-L336); the loader stores
 # the dilemma source cut that way, and the other two values are already two tokens.
+# Kept for fidelity: the cut makes `expert_written` equal to `expert_case` (D-26).
 CATEGORY_KEYS = ("dilemma_source_group", "role_domain", "dilemma_type")
 
-# The same for MoReBench-Theory, from calculate_morebench_theory.py L31 at e6689bb. The
-# theory values are whole theory names, which upstream does not cut.
+# The same for MoReBench-Theory, from calculate_morebench_theory.py L31 at e6689bb.
+# Upstream cuts the theory values too, but they are theory names with no `_`, so the cut
+# leaves them whole.
 THEORY_CATEGORY_KEYS = ("theory", "dilemma_source_group")
 
 # A weight's group in `Score.value`, written by `score_value`: `w3`, `w-2`.

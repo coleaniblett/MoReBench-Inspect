@@ -23,7 +23,7 @@ Update this table at the end of each task.
 | T8   | Add `morebench_theory`              | 4                      | Done 2026-11-17                                      |
 | T9   | Test coverage and lint pass         | 5, 6.1–6.2             | Done 2026-11-17                                      |
 | T10  | README                              | 6.3                    | Done 2026-11-17                                      |
-| T11  | Parity run and evaluation report    | 6.4                    | Not started                                          |
+| T11  | Parity run and evaluation report    | 6.4                    | In progress 2026-11-23                               |
 | T12  | Validity review and submission prep | 6.4                    | Done 2026-11-18; success criteria 5 to 7 wait on T11 |
 
 Also scheduled: the reasoning-effort test (`DECISIONS.md`, "Approved and scheduled"), once the pull request for `t05/scorer-and-metrics` is open. T11 waits for peer review, because the owner deferred D-19 until then.
